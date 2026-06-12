@@ -1,0 +1,18 @@
+# Blender 5.1.1 MTL File: 'rosliny.blend'
+# www.blender.org
+
+newmtl tatarak-imagetexture.003
+Ks 0.300000 0.300000 0.300000
+Ke 0.000000 0.000000 0.000000
+Ni 1.450000
+d 1.000000
+illum 2
+Pr 0.220490
+Pm 0.000000
+Ps 0.000000
+Pc 0.000000
+Pcr 0.030000
+aniso 0.000000
+anisor 0.000000
+map_Kd ../../materials/tatarak/tatarak3/tatarak3-diffuse.png
+map_Bump -bm 1.000000 ../../materials/tatarak/tatarak3/tatarak3-normal.png
