@@ -1,0 +1,35 @@
+# Blender 5.1.1 MTL File: 'rosliny.blend'
+# www.blender.org
+
+newmtl Shadowed_Forest_Lake_(Procedural)
+Kd 0.900000 0.970000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.333000
+d 1.000000
+illum 2
+Pr 0.100000
+Pm 0.000000
+Ps 0.000000
+Pc 0.000000
+Pcr 0.030000
+aniso 0.000000
+anisor 0.000000
+Tf 1.000000 1.000000 1.000000
+
+newmtl woda-jezioro-imagetexture
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+Pm 0.000000
+Ps 0.000000
+Pc 0.000000
+Pcr 0.030000
+aniso 0.000000
+anisor 0.000000
+Tf 1.000000 1.000000 1.000000
+map_Kd ../../materials/strzeszynek/woda-jezioro-diffuse.png
+map_Pr ../../materials/strzeszynek/woda-jezioro-roughness.png
+map_Bump -bm 1.000000 ../../materials/strzeszynek/woda-jezioro-normal.png
