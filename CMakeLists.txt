@@ -1,0 +1,41 @@
+cmake_minimum_required(VERSION 3.20)
+project(JezioraPolski-GRK C CXX)
+
+set(CMAKE_CXX_STANDARD 17)
+
+# 1. Include directories for Glad and Homebrew paths
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
+
+if(APPLE)
+    include_directories(/opt/homebrew/include) # Apple Silicon Homebrew path
+    include_directories(/usr/local/include)     # Intel Mac path
+    link_directories(/opt/homebrew/lib)
+    link_directories(/usr/local/lib)
+endif()
+
+# 2. Find GLFW
+find_package(glfw3 REQUIRED)
+
+# 3. Define the executable target
+add_executable(JezioraPolski-GRK main.cpp src/glad.c)
+
+# 4. Link Libraries depending on the Operating System
+if(APPLE)
+    target_link_libraries(JezioraPolski-GRK
+            glfw
+            "-framework Cocoa"
+            "-framework OpenGL"
+            "-framework IOKit"
+            "-framework CoreVideo"
+    )
+elseif(WIN32)
+    target_link_libraries(JezioraPolski-GRK
+            glfw
+            opengl32
+    )
+else() # Linux / other Unix
+    target_link_libraries(JezioraPolski-GRK
+            glfw
+            GL
+    )
+endif()
