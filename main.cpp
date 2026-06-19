@@ -10,7 +10,6 @@
 #include <sstream>
 #include <algorithm>
 
-// Structure to hold vertex data
 struct Vertex {
     glm::vec3 position;
     glm::vec3 normal;
