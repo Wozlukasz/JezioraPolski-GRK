@@ -3,6 +3,13 @@ project(JezioraPolski-GRK C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 
+# Optimization flags for Release builds
+if(NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE Release)
+endif()
+set(CMAKE_CXX_FLAGS_RELEASE "-O2 -DNDEBUG")
+set(CMAKE_C_FLAGS_RELEASE "-O2 -DNDEBUG")
+
 # 1. Include directories for Glad and Homebrew paths
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 
@@ -23,6 +30,7 @@ set(SRC_FILES
     src/Shader.cpp
     src/Texture.cpp
     src/Utils.cpp
+    src/PlantManager.cpp
     src/glad.c
 )
 add_executable(JezioraPolski-GRK main.cpp ${SRC_FILES})

@@ -94,5 +94,42 @@ bool loadOBJ(const std::string& path, std::vector<Vertex>& out_vertices) {
             }
         }
     }
+
+    // Oblicz wektory Tangent i Bitangent dla każdego trójkąta (wymóg Normal Mappingu)
+    for (size_t i = 0; i < out_vertices.size(); i += 3) {
+        if (i + 2 >= out_vertices.size()) break;
+        Vertex& v0 = out_vertices[i];
+        Vertex& v1 = out_vertices[i+1];
+        Vertex& v2 = out_vertices[i+2];
+
+        glm::vec3 edge1 = v1.position - v0.position;
+        glm::vec3 edge2 = v2.position - v0.position;
+        glm::vec2 deltaUV1 = v1.texCoords - v0.texCoords;
+        glm::vec2 deltaUV2 = v2.texCoords - v0.texCoords;
+
+        float det = deltaUV1.x * deltaUV2.y - deltaUV2.x * deltaUV1.y;
+        float f = (det == 0.0f) ? 0.0f : 1.0f / det;
+
+        glm::vec3 tangent;
+        tangent.x = f * (deltaUV2.y * edge1.x - deltaUV1.y * edge2.x);
+        tangent.y = f * (deltaUV2.y * edge1.y - deltaUV1.y * edge2.y);
+        tangent.z = f * (deltaUV2.y * edge1.z - deltaUV1.y * edge2.z);
+        if(glm::length(tangent) > 0.0f) tangent = glm::normalize(tangent);
+
+        glm::vec3 bitangent;
+        bitangent.x = f * (-deltaUV2.x * edge1.x + deltaUV1.x * edge2.x);
+        bitangent.y = f * (-deltaUV2.x * edge1.y + deltaUV1.x * edge2.y);
+        bitangent.z = f * (-deltaUV2.x * edge1.z + deltaUV1.x * edge2.z);
+        if(glm::length(bitangent) > 0.0f) bitangent = glm::normalize(bitangent);
+
+        v0.tangent = tangent;
+        v1.tangent = tangent;
+        v2.tangent = tangent;
+
+        v0.bitangent = bitangent;
+        v1.bitangent = bitangent;
+        v2.bitangent = bitangent;
+    }
+
     return true;
 }

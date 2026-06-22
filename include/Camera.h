@@ -5,18 +5,27 @@
 
 // Expose camera variables
 extern glm::vec3 cameraPos;
+#include <glm/gtc/quaternion.hpp>
+
+extern glm::quat cameraOrientation;
 extern glm::vec3 cameraFront;
 extern glm::vec3 cameraUp;
+extern glm::vec3 cameraRight;
 
 extern bool firstMouse;
-extern float yaw;
-extern float pitch;
 extern float lastX;
 extern float lastY;
 extern float fov;
 extern bool captureMouse;
 
 // Time variables
+struct TerrainData {
+    float height;
+    glm::vec2 uv;
+};
+
+TerrainData getTerrainData(float x, float z);
+float getTerrainHeight(float x, float z);
 extern float deltaTime;
 extern float lastFrame;
 

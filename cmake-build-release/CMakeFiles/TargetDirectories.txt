@@ -1,0 +1,3 @@
+/Users/julekszamotula/CLionProjects/JezioraPolski-GRK/cmake-build-release/CMakeFiles/JezioraPolski-GRK.dir
+/Users/julekszamotula/CLionProjects/JezioraPolski-GRK/cmake-build-release/CMakeFiles/edit_cache.dir
+/Users/julekszamotula/CLionProjects/JezioraPolski-GRK/cmake-build-release/CMakeFiles/rebuild_cache.dir
