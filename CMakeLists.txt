@@ -17,7 +17,15 @@ endif()
 find_package(glfw3 REQUIRED)
 
 # 3. Define the executable target
-add_executable(JezioraPolski-GRK main.cpp src/glad.c)
+set(SRC_FILES
+    src/Camera.cpp
+    src/Model.cpp
+    src/Shader.cpp
+    src/Texture.cpp
+    src/Utils.cpp
+    src/glad.c
+)
+add_executable(JezioraPolski-GRK main.cpp ${SRC_FILES})
 
 # 4. Link Libraries depending on the Operating System
 if(APPLE)
