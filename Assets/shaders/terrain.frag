@@ -105,14 +105,14 @@ void main() {
     if (viewPos.y > 64.0) {
         // Kamera nad wodą
         if (FragPos.y < 64.0) {
-            // Patrzymy pod wodę - dno zanika w mroku (mętna woda)
+            // Patrzymy pod wodę - dno zanika w mroku szybciej
             float depth = 64.0 - FragPos.y;
-            fogFactor = clamp(depth / 10.0, 0.0, 1.0);
+            fogFactor = clamp(depth / 5.0, 0.0, 1.0);
         }
         // Na lądzie (FragPos.y >= 64.0) fogFactor zostaje 0.0
     } else {
-        // Kamera pod wodą - mgła dystansowa
-        fogFactor = clamp((dist - 5.0) / 30.0, 0.0, 1.0);
+        // Kamera pod wodą - mgła dystansowa 10m
+        fogFactor = clamp((dist - 2.0) / 8.0, 0.0, 1.0);
     }
     
     finalColor = mix(finalColor, fogColor, fogFactor);

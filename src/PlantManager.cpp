@@ -128,9 +128,10 @@ void PlantManager::loadSpecies(const std::string& name, const std::string& maskP
 
     std::vector<std::map<std::pair<int, int>, std::vector<glm::mat4>>> variantChunkedMatrices(species.variants.size());
 
-    // Aby wypełnić całe dno, drastycznie zwiększamy liczbę prób, 
-    // ale dzięki mgle podwodnej wyrenderujemy tylko mały ułamek tego wokół kamery
-    int numSpawnAttempts = hasTuft ? 25000 : 150000;
+    // Zmniejszono liczbę roślin o połowę na prośbę użytkownika.
+    int numSpawnAttempts = hasTuft ? 75000 : 300000;
+    
+    std::uniform_real_distribution<float> randomScale(1.0f, 2.5f); // Jeszcze większe rośliny (od 100% do 250%), żeby dno wyglądało jak dżungla
     
     for (int i = 0; i < numSpawnAttempts; ++i) {
         float x = distX(engine);
@@ -149,12 +150,11 @@ void PlantManager::loadSpecies(const std::string& name, const std::string& maskP
 
             if (hasTuft) {
                 float tuftRot = rotDist(engine);
-                int tuftIdx = 0;
                 for (auto& item : tuftJson) {
-                    // Przerzedzanie kępki — bierzemy tylko 1/6 elementów
-                    // Drastycznie zmniejsza to liczbę wielokątów w renderowanych roślinach!
-                    if (tuftIdx++ % 6 != 0) continue;
-
+                    // UWAGA: Usunięto przerzedzanie kępki. 
+                    // Pliki JSON składają pojedynczą roślinę z wielu małych modeli (np. łodyga + gałązki).
+                    // Wyrzucanie elementów niszczyło modele i tworzyło "dziurawe" rośliny!
+                    
                     int varIdx = item["variant"];
                     if (varIdx >= species.variants.size()) varIdx = species.variants.size() - 1;
                     
@@ -179,25 +179,59 @@ void PlantManager::loadSpecies(const std::string& name, const std::string& maskP
                     TerrainData itd = getTerrainData(worldX, worldZ);
                     if (itd.height < -900.0f) continue;
 
-                    glm::mat4 m = glm::translate(glm::mat4(1.0f), glm::vec3(worldX, itd.height + oy, worldZ));
+                    float currentScale = scaleMult * randomScale(engine);
+                    
+                    // Maksymalna fizyczna wysokość modelu to 1.4 metra (140 cm). 
+                    // Ponieważ natywny model ma ~1.2m, ograniczamy scale.
+                    float maxHeightScale = 1.4f / 1.2f;
+                    currentScale = std::min(currentScale, maxHeightScale);
+                    
+                    float currentY = itd.height + oy;
+                    
+                    // Żadna roślina (oprócz tataraku przy brzegu) nie może wystawać ponad wodę (Y = 64.0)
+                    // Rzeczywista wysokość modelu w pliku .obj to około 1.2 jednostki
+                    if (name != "Tatarak") {
+                        float topY = currentY + currentScale * 1.5f; // upewniamy się, że góra jest poprawnie liczona
+                        if (topY > 63.5f) {
+                            currentY -= (topY - 63.5f); // Przesuń w dół, aby góra wynosiła 63.5
+                        }
+                    }
+
+                    glm::mat4 m = glm::translate(glm::mat4(1.0f), glm::vec3(worldX, currentY, worldZ));
                     m = glm::rotate(m, glm::radians(tuftRot), glm::vec3(0,1,0));
                     m = glm::rotate(m, glm::radians(rx), glm::vec3(1,0,0));
                     m = glm::rotate(m, glm::radians(ry), glm::vec3(0,1,0));
                     m = glm::rotate(m, glm::radians(rz), glm::vec3(0,0,1));
-                    m = glm::scale(m, glm::vec3(sx, sy, sz) * scaleMult);
+                    m = glm::scale(m, glm::vec3(sx, sy, sz) * currentScale);
 
-                    int chunkX = std::floor(worldX / 25.0f);
-                    int chunkZ = std::floor(worldZ / 25.0f);
+                    int chunkX = std::floor(worldX / 10.0f);
+                    int chunkZ = std::floor(worldZ / 10.0f);
                     variantChunkedMatrices[varIdx][{chunkX, chunkZ}].push_back(m);
                 }
             } else {
                 int varIdx = engine() % species.variants.size();
-                glm::mat4 m = glm::translate(glm::mat4(1.0f), glm::vec3(x, td.height, z));
-                m = glm::rotate(m, glm::radians(rotDist(engine)), glm::vec3(0,1,0));
-                m = glm::scale(m, glm::vec3(scaleMult));
                 
-                int cx = std::floor(x / 25.0f);
-                int cz = std::floor(z / 25.0f);
+                float currentScale = scaleMult * randomScale(engine);
+                
+                // Ograniczenie wysokości do 140 cm
+                float maxHeightScale = 1.4f / 1.2f;
+                currentScale = std::min(currentScale, maxHeightScale);
+
+                float currentY = td.height;
+                
+                if (name != "Tatarak") {
+                    float topY = currentY + currentScale * 1.5f;
+                    if (topY > 63.5f) {
+                        currentY -= (topY - 63.5f);
+                    }
+                }
+
+                glm::mat4 m = glm::translate(glm::mat4(1.0f), glm::vec3(x, currentY, z));
+                m = glm::rotate(m, glm::radians(rotDist(engine)), glm::vec3(0,1,0));
+                m = glm::scale(m, glm::vec3(currentScale));
+                
+                int cx = std::floor(x / 10.0f);
+                int cz = std::floor(z / 10.0f);
                 variantChunkedMatrices[varIdx][{cx, cz}].push_back(m);
             }
         }
@@ -207,8 +241,8 @@ void PlantManager::loadSpecies(const std::string& name, const std::string& maskP
         for (const auto& pair : variantChunkedMatrices[i]) {
             PlantChunk chunk;
             chunk.instanceCount = pair.second.size();
-            float cx = pair.first.first * 25.0f + 12.5f;
-            float cz = pair.first.second * 25.0f + 12.5f;
+            float cx = pair.first.first * 10.0f + 5.0f;
+            float cz = pair.first.second * 10.0f + 5.0f;
             float cy = getTerrainHeight(cx, cz);
             if (cy < -900.0f) cy = -10.0f; // fallback
             chunk.center = glm::vec3(cx, cy, cz);
@@ -271,9 +305,9 @@ void PlantManager::render(unsigned int shader, const glm::vec3& camPos, const gl
     glUseProgram(shader);
     glm::vec2 camPos2D(camPos.x, camPos.z);
     auto frustumPlanes = extractFrustumPlanes(vpMatrix);
-    // Kiedy jesteśmy nad wodą, widzimy trochę dalej. Pod wodą mgła ogranicza widoczność do 30m.
-    float RENDER_DIST = (camPos.y > 64.0f) ? 80.0f : 40.0f; 
-    const float CHUNK_RADIUS = 25.0f; // sqrt(12.5^2 + 12.5^2) to 17.68, dodajemy margines na wysokość roślin
+    // Widoczność pod wodą ograniczona do 10m
+    float RENDER_DIST = (camPos.y > 64.0f) ? 60.0f : 10.0f; 
+    const float CHUNK_RADIUS = 7.07f; // sqrt(5.0^2 + 5.0^2) to 7.07, margines dla małego chunka
     
     for (auto& species : speciesList) {
         glActiveTexture(GL_TEXTURE0);
@@ -285,8 +319,19 @@ void PlantManager::render(unsigned int shader, const glm::vec3& camPos, const gl
                 float dist = glm::distance(chunkPos2D, camPos2D);
                 if (dist < RENDER_DIST + CHUNK_RADIUS &&
                     sphereInFrustum(frustumPlanes, chunk.center, CHUNK_RADIUS)) {
+                    
+                    int drawInstanceCount = chunk.instanceCount;
+                    // Poprawny system LOD - zamiast ciąć modele w połowie (dziury w łodydze),
+                    // po prostu zmniejszamy liczbę rysowanych całych roślin w dalekich chunkach!
+                    // Zmieniony LOD dopasowany do max 10m widoczności
+                    if (dist > 8.0f) {
+                        drawInstanceCount = chunk.instanceCount / 4; 
+                    } else if (dist > 5.0f) {
+                        drawInstanceCount = chunk.instanceCount / 2; 
+                    }
+
                     glBindVertexArray(chunk.vao);
-                    glDrawArraysInstanced(GL_TRIANGLES, 0, var.vertexCount, chunk.instanceCount);
+                    glDrawArraysInstanced(GL_TRIANGLES, 0, var.vertexCount, drawInstanceCount);
                 }
             }
         }
@@ -299,8 +344,8 @@ void PlantManager::renderShadow(unsigned int shadowShader, const glm::vec3& camP
     
     glm::vec2 camPos2D(camPos.x, camPos.z);
     auto frustumPlanes = extractFrustumPlanes(vpMatrix);
-    const float SHADOW_DIST = 25.0f; // Krótszy dystans dla cieni (w mętnej wodzie słabo je widać w dali)
-    const float CHUNK_RADIUS = 25.0f;
+    const float SHADOW_DIST = 10.0f; // Cienie też tylko na 10m
+    const float CHUNK_RADIUS = 7.07f;
     
     for (auto& species : speciesList) {
         glActiveTexture(GL_TEXTURE0);
@@ -312,8 +357,16 @@ void PlantManager::renderShadow(unsigned int shadowShader, const glm::vec3& camP
                 float dist = glm::distance(chunkPos2D, camPos2D);
                 if (dist < SHADOW_DIST + CHUNK_RADIUS &&
                     sphereInFrustum(frustumPlanes, chunk.center, CHUNK_RADIUS * 2.0f)) {
+                    
+                    int drawInstanceCount = chunk.instanceCount;
+                    if (dist > 5.0f) {
+                        drawInstanceCount = chunk.instanceCount / 4; 
+                    } else {
+                        drawInstanceCount = chunk.instanceCount / 2; 
+                    }
+
                     glBindVertexArray(chunk.vao);
-                    glDrawArraysInstanced(GL_TRIANGLES, 0, var.vertexCount, chunk.instanceCount);
+                    glDrawArraysInstanced(GL_TRIANGLES, 0, var.vertexCount, drawInstanceCount);
                 }
             }
         }

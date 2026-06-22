@@ -224,7 +224,10 @@ int main() {
         // Cienie roślin
         glUseProgram(shadowPlantShader);
         glUniformMatrix4fv(loc_shadowPlant_lightSpaceMatrix, 1, GL_FALSE, glm::value_ptr(lightSpaceMatrix));
-        plantManager.renderShadow(shadowPlantShader, cameraPos, vpMatrix);
+        // Tylko rysuj rośliny/cienie jeśli jesteśmy pod wodą
+        if (cameraPos.y <= 64.0f) {
+            plantManager.renderShadow(shadowPlantShader, cameraPos, vpMatrix);
+        }
         
         glEnable(GL_CULL_FACE);
         glCullFace(GL_BACK);
@@ -266,7 +269,10 @@ int main() {
         glUniform3fv(loc_plant_viewPos, 1, glm::value_ptr(cameraPos));
         
         glDisable(GL_CULL_FACE); // Wyłącz culling dla dwustronnych liści
-        plantManager.render(plantShader, cameraPos, vpMatrix);
+        // Rośliny renderowane tylko pod wodą
+        if (cameraPos.y <= 64.0f) {
+            plantManager.render(plantShader, cameraPos, vpMatrix);
+        }
         glEnable(GL_CULL_FACE);
 
         // Woda

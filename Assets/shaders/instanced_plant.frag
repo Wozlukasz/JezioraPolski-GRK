@@ -30,7 +30,10 @@ void main() {
     float diff = max(dot(norm, lightVector), 0.0);
     vec3 diffuse = diff * vec3(1.0);
     
-    float shadow = ShadowCalculation(FragPosLightSpace, norm, lightVector);       
+    // Zgodnie z prośbą, wyłączamy cienie rzucane na rośliny. 
+    // Znacznie poprawia to wydajność i sprawia, że modele wyglądają bardziej "zielono".
+    // (Rośliny nadal renderują się w przepustowości cieni, więc teren będzie miał cienie roślin)
+    float shadow = 0.0;       
     vec3 ambient = vec3(0.2) * texColor.rgb;
     
     vec3 finalColor = ambient + (1.0 - shadow) * diffuse * texColor.rgb;
@@ -43,13 +46,13 @@ void main() {
     if (viewPos.y > 64.0) {
         // Kamera nad wodą
         if (FragPos.y < 64.0) {
-            // Rośliny pod wodą zanikają wraz z głębokością
+            // Rośliny pod wodą zanikają wraz z głębokością - szybko (10m)
             float depth = 64.0 - FragPos.y;
-            fogFactor = clamp(depth / 10.0, 0.0, 1.0);
+            fogFactor = clamp(depth / 5.0, 0.0, 1.0);
         }
     } else {
-        // Kamera pod wodą
-        fogFactor = clamp((dist - 5.0) / 30.0, 0.0, 1.0);
+        // Kamera pod wodą - widoczność ograniczona do 10m
+        fogFactor = clamp((dist - 2.0) / 8.0, 0.0, 1.0);
     }
     
     finalColor = mix(finalColor, fogColor, fogFactor);
