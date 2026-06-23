@@ -9,6 +9,7 @@ in vec4 FragPosLightSpace;
 
 uniform vec3 lightDir;
 uniform vec3 viewPos;
+uniform float time;
 
 uniform sampler2D splatMap;
 uniform sampler2D texMud;
@@ -42,6 +43,16 @@ float ShadowCalculation(vec4 fragPosLightSpace, vec3 normal, vec3 lightDir) {
     }
     shadow /= 9.0;
     return shadow;
+}
+
+// Kaustyki podwodne — symulacja falujących plam światła na dnie
+float caustics(vec3 pos, float time) {
+    vec2 p = pos.xz * 0.15;
+    float c1 = sin(p.x * 3.7 + time * 1.3) * cos(p.y * 2.9 + time * 0.9);
+    float c2 = sin(p.x * 5.1 - time * 1.7) * cos(p.y * 4.3 + time * 1.1);
+    float c3 = sin((p.x + p.y) * 2.3 + time * 0.8);
+    float c = (c1 + c2 * 0.5 + c3 * 0.3) * 0.5 + 0.5;
+    return smoothstep(0.3, 0.8, c);
 }
 
 void main() {
@@ -93,13 +104,23 @@ void main() {
     // Shadow
     float shadow = ShadowCalculation(FragPosLightSpace, norm, lightVector);       
 
-    vec3 ambient = vec3(0.15, 0.2, 0.25) * baseColor;
+    vec3 ambient = vec3(0.20, 0.25, 0.18) * baseColor;
     
     vec3 finalColor = ambient + (1.0 - shadow) * (diffuse + specular);
 
+    // === Kaustyki podwodne ===
+    // Animowane plamy światła na dnie, widoczne tylko pod wodą
+    if (FragPos.y < 63.5 && FragPos.y > 55.0) {
+        float causticsIntensity = caustics(FragPos, time);
+        float depthFade = clamp((63.5 - FragPos.y) / 8.0, 0.0, 1.0);
+        float causticsStrength = causticsIntensity * (1.0 - depthFade) * 0.30;
+        // Ciepłe, zielonkawo-żółte kaustyki jak na zdjęciu referencyjnym
+        finalColor += vec3(0.10, 0.18, 0.05) * causticsStrength * (1.0 - shadow);
+    }
+
     // Mgła podwodna — ograniczona widoczność jak w polskim jeziorze
     float dist = length(viewPos - FragPos);
-    vec3 fogColor = vec3(0.05, 0.12, 0.08);
+    vec3 fogColor = vec3(0.15, 0.35, 0.12); // Ciepła, jasna zieleń jak na zdjęciu referencyjnym
     float fogFactor = 0.0;
     
     if (viewPos.y > 64.0) {
@@ -113,6 +134,14 @@ void main() {
     } else {
         // Kamera pod wodą - mgła dystansowa 10m
         fogFactor = clamp((dist - 2.0) / 8.0, 0.0, 1.0);
+        
+        // Absorpcja barw pod wodą: ciepły zielony ton
+        if (FragPos.y < 64.0) {
+            float waterDepth = clamp((64.0 - FragPos.y) / 15.0, 0.0, 1.0);
+            finalColor.r *= mix(1.0, 0.6, waterDepth);  // Czerwień znika
+            finalColor.g *= mix(1.0, 1.1, waterDepth);  // Zieleń się wzmacnia
+            finalColor.b *= mix(1.0, 0.5, waterDepth);  // Niebieski zanika (ciepły ton)
+        }
     }
     
     finalColor = mix(finalColor, fogColor, fogFactor);

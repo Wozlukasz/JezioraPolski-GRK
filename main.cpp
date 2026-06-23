@@ -187,6 +187,11 @@ int main() {
 
     GLint loc_skybox_view = glGetUniformLocation(skyboxShader, "view");
     GLint loc_skybox_projection = glGetUniformLocation(skyboxShader, "projection");
+    GLint loc_skybox_viewPos = glGetUniformLocation(skyboxShader, "viewPos");
+
+    // Nowe uniformy dla kaustyk podwodnych i SSS
+    GLint loc_terrain_time = glGetUniformLocation(terrainShader, "time");
+    GLint loc_plant_time = glGetUniformLocation(plantShader, "time");
 
     while (!glfwWindowShouldClose(window)) {
         float currentFrame = static_cast<float>(glfwGetTime());
@@ -235,7 +240,12 @@ int main() {
 
         // 2. Normal render pass
         glViewport(0, 0, width, height);
-        glClearColor(0.53f, 0.81f, 0.92f, 1.0f);
+        // Dynamiczny kolor tła — pod wodą jasna zieleń, nad wodą niebo
+        if (cameraPos.y <= 64.0f) {
+            glClearColor(0.15f, 0.35f, 0.12f, 1.0f); // Ciepła zieleń podwodna
+        } else {
+            glClearColor(0.53f, 0.81f, 0.92f, 1.0f); // Jasne niebo
+        }
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         // Teren
@@ -256,6 +266,7 @@ int main() {
         glUniformMatrix4fv(loc_terrain_lightSpaceMatrix, 1, GL_FALSE, glm::value_ptr(lightSpaceMatrix));
         glUniform3fv(loc_terrain_lightDir, 1, glm::value_ptr(lightDir));
         glUniform3fv(loc_terrain_viewPos, 1, glm::value_ptr(cameraPos));
+        glUniform1f(loc_terrain_time, currentFrame);
         glBindVertexArray(terrainVAO);
         glDrawArrays(GL_TRIANGLES, 0, globalTerrainVertices.size());
 
@@ -267,6 +278,7 @@ int main() {
         glUniformMatrix4fv(loc_plant_lightSpaceMatrix, 1, GL_FALSE, glm::value_ptr(lightSpaceMatrix));
         glUniform3fv(loc_plant_lightDir, 1, glm::value_ptr(lightDir));
         glUniform3fv(loc_plant_viewPos, 1, glm::value_ptr(cameraPos));
+        glUniform1f(loc_plant_time, currentFrame);
         
         glDisable(GL_CULL_FACE); // Wyłącz culling dla dwustronnych liści
         // Rośliny renderowane tylko pod wodą
@@ -293,6 +305,7 @@ int main() {
         glm::mat4 skyView = glm::mat4(glm::mat3(view)); 
         glUniformMatrix4fv(loc_skybox_view, 1, GL_FALSE, glm::value_ptr(skyView));
         glUniformMatrix4fv(loc_skybox_projection, 1, GL_FALSE, glm::value_ptr(projection));
+        glUniform3fv(loc_skybox_viewPos, 1, glm::value_ptr(cameraPos));
         glBindVertexArray(skyboxVAO);
         glDrawArrays(GL_TRIANGLES, 0, 36);
         glDepthFunc(GL_LESS); 

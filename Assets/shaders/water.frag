@@ -8,6 +8,7 @@ in vec2 TexCoords;
 uniform vec3 lightDir;
 uniform vec3 viewPos;
 uniform sampler2D texWater;
+uniform float time;
 
 vec4 hash4(vec2 p) {
     return fract(sin(vec4(1.0+dot(p,vec2(37.0,17.0)), 
@@ -48,17 +49,78 @@ vec3 sampleNoTile(sampler2D samp, vec2 uv) {
 void main() {
     vec2 uv = TexCoords * 100.0;
     
-    vec3 waterTexColor = sampleNoTile(texWater, uv);
-    vec3 waterColor = waterTexColor * vec3(0.5, 0.8, 1.0); // Semi-transparent turquoise water
+    // Dynamiczne zniekształcenie UV zależne od czasu — symuluje falowanie
+    vec2 distortion1 = vec2(
+        sin(uv.x * 0.3 + time * 0.4) * 0.02,
+        cos(uv.y * 0.3 + time * 0.35) * 0.02
+    );
+    vec2 distortion2 = vec2(
+        cos(uv.x * 0.15 - time * 0.25) * 0.015,
+        sin(uv.y * 0.15 + time * 0.3) * 0.015
+    );
+    vec2 animatedUV = uv + distortion1 + distortion2;
+    
+    vec3 waterTexColor = sampleNoTile(texWater, animatedUV);
 
-    // Specular highlight representing the sun's reflection on waves
+    // Wylicz dynamiczny wektor normalny powierzchni wody z fal
     vec3 norm = normalize(Normal);
+    float wave1 = sin(FragPos.x * 0.4 + time * 1.6) * cos(FragPos.z * 0.3 + time * 1.1);
+    float wave2 = sin(FragPos.x * 0.7 - time * 0.9) * cos(FragPos.z * 0.5 + time * 0.7);
+    float wave3 = sin(FragPos.x * 1.3 + FragPos.z * 0.8 + time * 2.1) * 0.3;
+    vec3 waveNormal = normalize(vec3(
+        -0.03 * (wave1 + wave2 * 0.5 + wave3),
+        1.0,
+        -0.03 * (wave1 * 0.7 - wave2 * 0.4 + wave3)
+    ));
+    norm = normalize(mix(norm, waveNormal, 0.7));
+
     vec3 viewDir = normalize(viewPos - FragPos);
     vec3 lightVector = normalize(lightDir);
-    
-    vec3 halfwayDir = normalize(lightVector + viewDir);
-    float spec = pow(max(dot(norm, halfwayDir), 0.0), 128.0);
-    vec3 specular = vec3(0.9, 0.95, 1.0) * spec * 0.9;
 
-    FragColor = vec4(waterColor + specular, 0.70); // 70% transparency
+    // Efekt Fresnela — pod ostrym kątem woda staje się bardziej lustrzana
+    float fresnel = pow(1.0 - max(dot(norm, viewDir), 0.0), 4.0);
+    fresnel = clamp(fresnel, 0.05, 0.85);
+    
+    // Kolor wody: głęboki zielono-niebieski jak w polskim jeziorze
+    vec3 deepWaterColor = vec3(0.02, 0.08, 0.06);    // głęboka ciemna zieleń
+    vec3 shallowWaterColor = vec3(0.08, 0.20, 0.15); // płytsza, jaśniejsza
+    
+    // Mieszanie tekstury wody z kolorem bazowym
+    vec3 surfaceColor = mix(deepWaterColor, shallowWaterColor, 0.4) + waterTexColor * 0.15;
+    
+    // Kolor odbicia nieba (zielonkawy, przyciemniony — to jezioro, nie ocean!)
+    vec3 skyReflectionColor = vec3(0.30, 0.50, 0.45);
+    
+    // Łączymy Fresnel: pod kątem prostym widać ciemne dno, pod ostrym — niebo
+    vec3 waterColor = mix(surfaceColor, skyReflectionColor, fresnel);
+
+    // Odblask słońca (specular) — ograniczony, naturalistyczny
+    vec3 halfwayDir = normalize(lightVector + viewDir);
+    float spec = pow(max(dot(norm, halfwayDir), 0.0), 256.0);
+    vec3 specular = vec3(1.0, 0.97, 0.90) * spec * 0.7;
+
+    // Dodatkowy miękki blask (sun glint) — rozproszone iskierki na falach
+    float glint = pow(max(dot(norm, halfwayDir), 0.0), 32.0);
+    specular += vec3(0.9, 0.85, 0.7) * glint * 0.08;
+
+    // Oświetlenie dyfuzyjne (delikatne, bo woda jest ciemna)
+    float diff = max(dot(norm, lightVector), 0.0);
+    waterColor += diff * vec3(0.03, 0.06, 0.04);
+
+    // Przezroczystość zależna od Fresnela i kąta patrzenia
+    float alpha = mix(0.75, 0.95, fresnel);
+
+    // Pod wodą — woda jest nieprzezroczysta (patrzymy od spodu na taflę)
+    if (viewPos.y < 64.0) {
+        waterColor = vec3(0.04, 0.10, 0.07);
+        specular = vec3(0.0);
+        alpha = 0.85;
+        
+        // Promień Snella: słońce widoczne jako jasna plama z dołu
+        vec3 refractedSun = refract(-lightVector, vec3(0.0, -1.0, 0.0), 1.0/1.33);
+        float underSunGlow = pow(max(dot(viewDir, -refractedSun), 0.0), 40.0);
+        waterColor += vec3(0.15, 0.20, 0.12) * underSunGlow;
+    }
+
+    FragColor = vec4(waterColor + specular, alpha);
 }
