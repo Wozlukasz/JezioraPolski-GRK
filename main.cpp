@@ -229,10 +229,8 @@ int main() {
         // Cienie roślin
         glUseProgram(shadowPlantShader);
         glUniformMatrix4fv(loc_shadowPlant_lightSpaceMatrix, 1, GL_FALSE, glm::value_ptr(lightSpaceMatrix));
-        // Tylko rysuj rośliny/cienie jeśli jesteśmy pod wodą
-        if (cameraPos.y <= 64.0f) {
-            plantManager.renderShadow(shadowPlantShader, cameraPos, vpMatrix);
-        }
+        // Renderowanie cieni roślin (zawsze, żeby było widać cienie z brzegu)
+        plantManager.renderShadow(shadowPlantShader, cameraPos, vpMatrix);
         
         glEnable(GL_CULL_FACE);
         glCullFace(GL_BACK);
@@ -242,7 +240,7 @@ int main() {
         glViewport(0, 0, width, height);
         // Dynamiczny kolor tła — pod wodą jasna zieleń, nad wodą niebo
         if (cameraPos.y <= 64.0f) {
-            glClearColor(0.15f, 0.35f, 0.12f, 1.0f); // Ciepła zieleń podwodna
+            glClearColor(0.25f, 0.45f, 0.15f, 1.0f); // Jaśniejsza zieleń (zgodnie z mgłą)
         } else {
             glClearColor(0.53f, 0.81f, 0.92f, 1.0f); // Jasne niebo
         }
@@ -281,10 +279,8 @@ int main() {
         glUniform1f(loc_plant_time, currentFrame);
         
         glDisable(GL_CULL_FACE); // Wyłącz culling dla dwustronnych liści
-        // Rośliny renderowane tylko pod wodą
-        if (cameraPos.y <= 64.0f) {
-            plantManager.render(plantShader, cameraPos, vpMatrix);
-        }
+        // Rośliny renderowane zawsze, aby tatarak przy brzegu był widoczny
+        plantManager.render(plantShader, cameraPos, vpMatrix);
         glEnable(GL_CULL_FACE);
 
         // Woda

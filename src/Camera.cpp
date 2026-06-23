@@ -4,7 +4,7 @@
 #include <vector>
 
 // Global Camera variables
-glm::vec3 cameraPos = glm::vec3(-375.0f, 66.0f, -322.0f); // Spawnpoint na brzegu
+glm::vec3 cameraPos = glm::vec3(32.1f, 66.0f, 38.3f); // Spawnpoint na brzegu blisko środka mapy
 glm::quat cameraOrientation = glm::quat(glm::vec3(glm::radians(-15.0f), glm::radians(-45.0f), 0.0f));
 
 glm::vec3 cameraFront = cameraOrientation * glm::vec3(0.0f, 0.0f, -1.0f);

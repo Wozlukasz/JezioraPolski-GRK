@@ -58,7 +58,8 @@ float caustics(vec3 pos, float time) {
 void main() {
     float y = FragPos.y;
     
-    vec2 uv = TexCoords * 150.0;
+    // Zwiększamy krotność UV z 150 do 300, aby tekstura gruntu wydawała się drobniejsza
+    vec2 uv = TexCoords * 300.0;
     
     vec3 mudColor = texture(texMud, uv).rgb;
     vec3 soilColor = texture(texSoil, uv).rgb;
@@ -109,38 +110,57 @@ void main() {
     vec3 finalColor = ambient + (1.0 - shadow) * (diffuse + specular);
 
     // === Kaustyki podwodne ===
-    // Animowane plamy światła na dnie, widoczne tylko pod wodą
-    if (FragPos.y < 63.5 && FragPos.y > 55.0) {
+    if (FragPos.y < 63.5 && FragPos.y > 50.0) {
         float causticsIntensity = caustics(FragPos, time);
-        float depthFade = clamp((63.5 - FragPos.y) / 8.0, 0.0, 1.0);
-        float causticsStrength = causticsIntensity * (1.0 - depthFade) * 0.30;
-        // Ciepłe, zielonkawo-żółte kaustyki jak na zdjęciu referencyjnym
-        finalColor += vec3(0.10, 0.18, 0.05) * causticsStrength * (1.0 - shadow);
+        float depthFade = clamp((63.5 - FragPos.y) / 12.0, 0.0, 1.0);
+        float causticsStrength = causticsIntensity * (1.0 - depthFade) * 0.35;
+        finalColor += vec3(0.12, 0.22, 0.06) * causticsStrength * (1.0 - shadow);
     }
 
-    // Mgła podwodna — ograniczona widoczność jak w polskim jeziorze
+    // === Podwodne refleksy światła (god rays / light shafts) ===
+    // Animowane słupy światła padające z góry przez wodę
+    if (FragPos.y < 64.0 && viewPos.y < 64.0) {
+        vec3 lightVec = normalize(lightDir);
+        // Promienie zależne od pozycji XZ, powoli płynące
+        float ray1 = sin(FragPos.x * 0.08 + time * 0.3) * cos(FragPos.z * 0.06 + time * 0.2);
+        float ray2 = sin(FragPos.x * 0.12 - time * 0.15) * cos(FragPos.z * 0.1 + time * 0.25);
+        float ray3 = sin((FragPos.x + FragPos.z) * 0.05 + time * 0.18);
+        float rayPattern = (ray1 + ray2 * 0.7 + ray3 * 0.4) * 0.5 + 0.5;
+        rayPattern = smoothstep(0.35, 0.85, rayPattern);
+        
+        // Siła promieni maleje z głębokością
+        float surfaceDist = 64.0 - FragPos.y;
+        float rayFade = exp(-surfaceDist * 0.12);
+        
+        // Kierunkowa składowa — promienie są silniejsze gdy patrzymy w stronę światła
+        float viewLightDot = max(dot(normalize(viewPos - FragPos), lightVec), 0.0);
+        float directional = mix(0.3, 1.0, pow(viewLightDot, 2.0));
+        
+        float rayStrength = rayPattern * rayFade * directional * 0.20;
+        finalColor += vec3(0.15, 0.25, 0.08) * rayStrength;
+    }
+
+    // Mgła podwodna — miękka, eksponencjalna (realistyczna)
     float dist = length(viewPos - FragPos);
-    vec3 fogColor = vec3(0.15, 0.35, 0.12); // Ciepła, jasna zieleń jak na zdjęciu referencyjnym
+    vec3 fogColor = vec3(0.25, 0.45, 0.15); // Jaśniejsza, bardziej żółta zieleń jak ze zdjęcia
     float fogFactor = 0.0;
     
     if (viewPos.y > 64.0) {
-        // Kamera nad wodą
         if (FragPos.y < 64.0) {
-            // Patrzymy pod wodę - dno zanika w mroku szybciej
             float depth = 64.0 - FragPos.y;
-            fogFactor = clamp(depth / 5.0, 0.0, 1.0);
+            fogFactor = 1.0 - exp(-depth * 0.25);
         }
-        // Na lądzie (FragPos.y >= 64.0) fogFactor zostaje 0.0
     } else {
-        // Kamera pod wodą - mgła dystansowa 10m
-        fogFactor = clamp((dist - 2.0) / 8.0, 0.0, 1.0);
+        // Eksponencjalna mgła dystansowa — gładkie zanikanie zamiast ostrego cięcia
+        float fogDensity = 0.12; // Im wyższa wartość, tym gęstsza mgła
+        fogFactor = 1.0 - exp(-dist * fogDensity);
         
         // Absorpcja barw pod wodą: ciepły zielony ton
         if (FragPos.y < 64.0) {
             float waterDepth = clamp((64.0 - FragPos.y) / 15.0, 0.0, 1.0);
-            finalColor.r *= mix(1.0, 0.6, waterDepth);  // Czerwień znika
-            finalColor.g *= mix(1.0, 1.1, waterDepth);  // Zieleń się wzmacnia
-            finalColor.b *= mix(1.0, 0.5, waterDepth);  // Niebieski zanika (ciepły ton)
+            finalColor.r *= mix(1.0, 0.6, waterDepth);
+            finalColor.g *= mix(1.0, 1.1, waterDepth);
+            finalColor.b *= mix(1.0, 0.5, waterDepth);
         }
     }
     
