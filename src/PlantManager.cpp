@@ -19,19 +19,12 @@ using json = nlohmann::json;
 // ---- Frustum Culling Helpers ----
 static std::array<glm::vec4, 6> extractFrustumPlanes(const glm::mat4& vp) {
     std::array<glm::vec4, 6> planes;
-    // Left
     planes[0] = glm::vec4(vp[0][3] + vp[0][0], vp[1][3] + vp[1][0], vp[2][3] + vp[2][0], vp[3][3] + vp[3][0]);
-    // Right
     planes[1] = glm::vec4(vp[0][3] - vp[0][0], vp[1][3] - vp[1][0], vp[2][3] - vp[2][0], vp[3][3] - vp[3][0]);
-    // Bottom
     planes[2] = glm::vec4(vp[0][3] + vp[0][1], vp[1][3] + vp[1][1], vp[2][3] + vp[2][1], vp[3][3] + vp[3][1]);
-    // Top
     planes[3] = glm::vec4(vp[0][3] - vp[0][1], vp[1][3] - vp[1][1], vp[2][3] - vp[2][1], vp[3][3] - vp[3][1]);
-    // Near
     planes[4] = glm::vec4(vp[0][3] + vp[0][2], vp[1][3] + vp[1][2], vp[2][3] + vp[2][2], vp[3][3] + vp[3][2]);
-    // Far
     planes[5] = glm::vec4(vp[0][3] - vp[0][2], vp[1][3] - vp[1][2], vp[2][3] - vp[2][2], vp[3][3] - vp[3][2]);
-    // Normalize planes
     for (auto& p : planes) {
         float len = glm::length(glm::vec3(p));
         if (len > 0.0f) p /= len;
@@ -88,12 +81,14 @@ void PlantManager::setupChunkVAO(unsigned int baseVBO, const std::vector<glm::ma
     glBindVertexArray(0);
 }
 
-void PlantManager::loadSpecies(const std::string& name, const std::string& maskPath, const std::string& tuftJsonPath, const std::string& texPath, const std::vector<std::string>& variantPaths, float scaleMult) {
+void PlantManager::loadSpecies(const std::string& name, const std::string& maskPath, const std::string& tuftJsonPath, const std::string& texPath, const std::vector<std::string>& variantPaths, float scaleMult,
+                               const std::string& flatModelPath, const std::string& flatTexPath) {
     std::cout << "Ladowanie gatunku: " << name << std::endl;
     PlantSpecies species;
     species.name = name;
     species.textureDiffuse = loadTexture(findAssetPath(texPath).c_str());
 
+    // Wczytaj szczegółowe warianty modeli
     for (const auto& vp : variantPaths) {
         PlantVariant pv;
         std::vector<Vertex> verts;
@@ -106,8 +101,24 @@ void PlantManager::loadSpecies(const std::string& name, const std::string& maskP
         }
     }
 
+    // Wczytaj flat (billboard) model jeśli podano
+    if (!flatModelPath.empty()) {
+        std::vector<Vertex> flatVerts;
+        if (loadOBJ(findAssetPath(flatModelPath), flatVerts)) {
+            setupBaseVBO(flatVerts, species.flatLOD.baseVBO);
+            species.flatLOD.vertexCount = flatVerts.size();
+            if (!flatTexPath.empty()) {
+                species.flatLOD.textureDiffuse = loadTexture(findAssetPath(flatTexPath).c_str());
+            } else {
+                species.flatLOD.textureDiffuse = species.textureDiffuse;
+            }
+            species.flatLOD.valid = true;
+            std::cout << "  -> Flat LOD loaded: " << flatModelPath << " (" << flatVerts.size() / 3 << " tris)" << std::endl;
+        }
+    }
+
     int w, h, channels;
-    stbi_set_flip_vertically_on_load(false); // Maski próbkowane z Top-Left dla wygody, upewnijmy sie
+    stbi_set_flip_vertically_on_load(false);
     unsigned char* maskData = stbi_load(findAssetPath(maskPath).c_str(), &w, &h, &channels, 1);
     if (!maskData) { std::cerr << "Nie udalo sie wczytac maski: " << maskPath << std::endl; return; }
 
@@ -127,18 +138,17 @@ void PlantManager::loadSpecies(const std::string& name, const std::string& maskP
     std::uniform_real_distribution<float> rotDist(0.0f, 360.0f);
 
     std::vector<std::map<std::pair<int, int>, std::vector<glm::mat4>>> variantChunkedMatrices(species.variants.size());
+    // Flat LOD zbiera WSZYSTKIE instancje (niezależnie od wariantu) do jednego flat mesha
+    std::map<std::pair<int, int>, std::vector<glm::mat4>> flatChunkedMatrices;
 
-    // Zoptymalizowana liczba prób. Kluczowa optymalizacja: kępki mają 67-165 elementów każda!
-    // Gęstsza "dżungla" zgodnie z prośbą, gigantyczna ilość roślin
-    int numSpawnAttempts = hasTuft ? 50000 : 250000;
+    // Gęsta dżungla podwodna — dużo prób spawnowania
+    int numSpawnAttempts = hasTuft ? 80000 : 400000;
     
     // Rośliny mają mieć do 1.5 metra wysokości.
-    // Oryginalny model ma ~1.2m, więc max skala to 1.5/1.2 = 1.25.
     std::uniform_real_distribution<float> randomScale(0.8f, 1.25f); 
     
-    // Ile elementów kępki pomijamy.
-    // Ustawienie na 3 daje bardzo gęste, puszyste krzaki, jak na zdjęciu referencyjnym.
-    int tuftStride = 3;
+    // Bierzemy co 4-ty element kępki (balans gęstość / wydajność)
+    int tuftStride = 4;
     
     for (int i = 0; i < numSpawnAttempts; ++i) {
         float x = distX(engine);
@@ -159,9 +169,6 @@ void PlantManager::loadSpecies(const std::string& name, const std::string& maskP
                 float tuftRot = rotDist(engine);
                 int tuftIdx = 0;
                 for (auto& item : tuftJson) {
-                    // Deterministyczne przerzedzanie: bierzemy co tuftStride-ty element.
-                    // To zachowuje strukturę modelu (równomiernie z całej kępki)
-                    // zamiast losowego kasowania które niszczyło modele.
                     if (tuftIdx++ % tuftStride != 0) continue;
                     
                     int varIdx = item["variant"];
@@ -179,7 +186,6 @@ void PlantManager::loadSpecies(const std::string& name, const std::string& maskP
                     float sy = item["scale"][1];
                     float sz = item["scale"][2];
 
-                    // Przekształcenie punktów kępki (obrót kępki dookoła własnej osi)
                     float cx = ox * cos(glm::radians(tuftRot)) - oz * sin(glm::radians(tuftRot));
                     float cz = ox * sin(glm::radians(tuftRot)) + oz * cos(glm::radians(tuftRot));
 
@@ -190,17 +196,12 @@ void PlantManager::loadSpecies(const std::string& name, const std::string& maskP
 
                     float currentScale = scaleMult * randomScale(engine);
                     
-                    // Pozwalamy roślinom rosnąć potężnie. Jeśli będą za duże,
-                    // po prostu zanurzymy je głębiej w mule na dnie.
-                    
                     float currentY = itd.height + oy;
                     
-                    // Żadna roślina (oprócz tataraku przy brzegu) nie może wystawać ponad wodę (Y = 64.0)
-                    // Rzeczywista wysokość modelu w pliku .obj to około 1.2 jednostki
                     if (name != "Tatarak") {
-                        float topY = currentY + currentScale * 1.5f; // upewniamy się, że góra jest poprawnie liczona
+                        float topY = currentY + currentScale * 1.5f;
                         if (topY > 63.5f) {
-                            currentY -= (topY - 63.5f); // Przesuń w dół, aby góra wynosiła 63.5
+                            currentY -= (topY - 63.5f);
                         }
                     }
 
@@ -214,6 +215,15 @@ void PlantManager::loadSpecies(const std::string& name, const std::string& maskP
                     int chunkX = std::floor(worldX / 10.0f);
                     int chunkZ = std::floor(worldZ / 10.0f);
                     variantChunkedMatrices[varIdx][{chunkX, chunkZ}].push_back(m);
+                    
+                    // Flat LOD na DOKŁADNIE tej samej pozycji co detal
+                    if (species.flatLOD.valid) {
+                        // Uproszczona macierz (bez obrotu elementów kępki — flat model sam ma krzyżyk)
+                        glm::mat4 flatM = glm::translate(glm::mat4(1.0f), glm::vec3(worldX, currentY, worldZ));
+                        flatM = glm::rotate(flatM, glm::radians(tuftRot), glm::vec3(0,1,0));
+                        flatM = glm::scale(flatM, glm::vec3(currentScale));
+                        flatChunkedMatrices[{chunkX, chunkZ}].push_back(flatM);
+                    }
                 }
             } else {
                 int varIdx = engine() % species.variants.size();
@@ -233,13 +243,19 @@ void PlantManager::loadSpecies(const std::string& name, const std::string& maskP
                 m = glm::rotate(m, glm::radians(rotDist(engine)), glm::vec3(0,1,0));
                 m = glm::scale(m, glm::vec3(currentScale));
                 
-                int cx = std::floor(x / 10.0f);
-                int cz = std::floor(z / 10.0f);
-                variantChunkedMatrices[varIdx][{cx, cz}].push_back(m);
+                int chunkX = std::floor(x / 10.0f);
+                int chunkZ = std::floor(z / 10.0f);
+                variantChunkedMatrices[varIdx][{chunkX, chunkZ}].push_back(m);
+                
+                // Dodaj flat LOD instancję
+                if (species.flatLOD.valid) {
+                    flatChunkedMatrices[{chunkX, chunkZ}].push_back(m);
+                }
             }
         }
     }
 
+    // Zbuduj chunki dla szczegółowych wariantów
     for (size_t i = 0; i < species.variants.size(); ++i) {
         for (const auto& pair : variantChunkedMatrices[i]) {
             PlantChunk chunk;
@@ -247,11 +263,27 @@ void PlantManager::loadSpecies(const std::string& name, const std::string& maskP
             float cx = pair.first.first * 10.0f + 5.0f;
             float cz = pair.first.second * 10.0f + 5.0f;
             float cy = getTerrainHeight(cx, cz);
-            if (cy < -900.0f) cy = -10.0f; // fallback
+            if (cy < -900.0f) cy = -10.0f;
             chunk.center = glm::vec3(cx, cy, cz);
             setupChunkVAO(species.variants[i].baseVBO, pair.second, chunk.vao, chunk.instVBO);
             species.variants[i].chunks.push_back(chunk);
         }
+    }
+
+    // Zbuduj chunki dla flat LOD
+    if (species.flatLOD.valid) {
+        for (const auto& pair : flatChunkedMatrices) {
+            PlantChunk chunk;
+            chunk.instanceCount = pair.second.size();
+            float cx = pair.first.first * 10.0f + 5.0f;
+            float cz = pair.first.second * 10.0f + 5.0f;
+            float cy = getTerrainHeight(cx, cz);
+            if (cy < -900.0f) cy = -10.0f;
+            chunk.center = glm::vec3(cx, cy, cz);
+            setupChunkVAO(species.flatLOD.baseVBO, pair.second, chunk.vao, chunk.instVBO);
+            species.flatLOD.chunks.push_back(chunk);
+        }
+        std::cout << "  -> Flat LOD chunks: " << species.flatLOD.chunks.size() << std::endl;
     }
 
     stbi_image_free(maskData);
@@ -264,33 +296,43 @@ void PlantManager::init() {
                 "Assets/distribution-masks/maska-moczarki-delikatne.png",
                 "Assets/tufts/moczarka-delikatna-kępka.json",
                 "Assets/materials/moczarka-delikatna/moczarka-delikatna-diffuse.png",
-                {"Assets/models/moczarka-delikatna/moczarka-delikatna-1.obj", "Assets/models/moczarka-delikatna/moczarka-delikatna-2.obj"}, 2.5f);
+                {"Assets/models/moczarka-delikatna/moczarka-delikatna-1.obj", "Assets/models/moczarka-delikatna/moczarka-delikatna-2.obj"}, 2.5f,
+                "Assets/flat-models/objects/moczarka-delikatna-flat.obj",
+                "Assets/flat-models/renders/moczarka-delikatna/moczarka-delikatna-flat0.png");
 
     loadSpecies("Mech Zdrojek", 
                 "Assets/distribution-masks/maska-mech-zdrojek.png",
                 "Assets/tufts/mech-zdrojek-kępka.json",
                 "Assets/materials/mech-zdrojek/mech-zdrojek-diffuse.png",
-                {"Assets/models/mech-zdrojek/mech-zdrojek-1.obj", "Assets/models/mech-zdrojek/mech-zdrojek-2.obj", "Assets/models/mech-zdrojek/mech-zdrojek-3.obj"}, 2.5f);
+                {"Assets/models/mech-zdrojek/mech-zdrojek-1.obj", "Assets/models/mech-zdrojek/mech-zdrojek-2.obj", "Assets/models/mech-zdrojek/mech-zdrojek-3.obj"}, 2.5f,
+                "Assets/flat-models/objects/mech-zdrojek-flat.obj",
+                "Assets/flat-models/renders/mech-zdrojek/mech-zdrojek-flat0.png");
 
     loadSpecies("Moczarka Kanadyjska", 
                 "Assets/distribution-masks/maska-moczarki-kanadyjskie.png",
                 "Assets/tufts/moczarka-kanadyjska-kępka.json",
                 "Assets/materials/moczarka-kanadyjska/moczarka-kanadyjska-diffuse.png",
-                {"Assets/models/moczarka-kanadyjska/moczarka-kanadyjska-1.obj", "Assets/models/moczarka-kanadyjska/moczarka-kanadyjska-2.obj", "Assets/models/moczarka-kanadyjska/moczarka-kanadyjska-3.obj"}, 2.5f);
+                {"Assets/models/moczarka-kanadyjska/moczarka-kanadyjska-1.obj", "Assets/models/moczarka-kanadyjska/moczarka-kanadyjska-2.obj", "Assets/models/moczarka-kanadyjska/moczarka-kanadyjska-3.obj"}, 2.5f,
+                "Assets/flat-models/objects/moczarka-kanadyjska-flat.obj",
+                "Assets/flat-models/renders/moczarka-kanadyjska/moczarka-kanadyjska-flat0.png");
 
     loadSpecies("Rogatek Sztywny", 
                 "Assets/distribution-masks/maska-rogatek-sztywny.png",
                 "Assets/tufts/rogatek-sztywny-kępka.json",
                 "Assets/materials/rogatek-sztywny/rogatek-sztywny-diffuse.png",
-                {"Assets/models/rogatek-sztywny/rogatek-sztywny-1.obj", "Assets/models/rogatek-sztywny/rogatek-sztywny-2.obj"}, 2.5f);
+                {"Assets/models/rogatek-sztywny/rogatek-sztywny-1.obj", "Assets/models/rogatek-sztywny/rogatek-sztywny-2.obj"}, 2.5f,
+                "Assets/flat-models/objects/rogatek-sztywny-flat.obj",
+                "Assets/flat-models/renders/rogatek-sztywny/rogatek-sztywny-flat0.png");
 
     loadSpecies("Rogatek Krotkoszyjkowy", 
                 "Assets/distribution-masks/maska-rogatek-krótkoszyjkowy.png",
                 "Assets/tufts/rogatek-krótkoszyjkowy-kępka.json",
                 "Assets/materials/rogatek-krótkoszyjkowy/rogatek-krótkoszyjkowy-diffuse.png",
-                {"Assets/models/rogatek-krótkoszyjkowy/rogatek-krótkoszyjkowy-1.obj", "Assets/models/rogatek-krótkoszyjkowy/rogatek-krótkoszyjkowy-2.obj"}, 2.5f);
+                {"Assets/models/rogatek-krótkoszyjkowy/rogatek-krótkoszyjkowy-1.obj", "Assets/models/rogatek-krótkoszyjkowy/rogatek-krótkoszyjkowy-2.obj"}, 2.5f,
+                "Assets/flat-models/objects/rogatek-krótkoszyjkowy-flat.obj",
+                "Assets/flat-models/renders/rogatek-krótkoszyjkowy/rogatek-krótkoszyjkowy-flat0.png");
 
-    // Brak json kępek dla tataraku i osoki
+    // Tatarak i Osoka — brak flat modeli
     loadSpecies("Tatarak", 
                 "Assets/distribution-masks/maska-tatarak.png",
                 "",
@@ -308,11 +350,18 @@ void PlantManager::render(unsigned int shader, const glm::vec3& camPos, const gl
     glUseProgram(shader);
     glm::vec2 camPos2D(camPos.x, camPos.z);
     auto frustumPlanes = extractFrustumPlanes(vpMatrix);
-    // Pod wodą renderujemy z większym promieniem, żeby rośliny nie wyskakiwały przed nosem
-    float RENDER_DIST = (camPos.y > 64.0f) ? 40.0f : 20.0f; 
+    
+    // Próg LOD: poniżej tego dystansu → szczegółowe, powyżej → flat.
+    // Chunk jest 10x10m, więc decyzja jest per-chunk: albo detail, albo flat.
+    const float LOD_THRESHOLD = 7.0f; // Próg przełączania (dopasowany do rozmiaru chunka)
+    const float RENDER_DIST = (camPos.y > 64.0f) ? 40.0f : 25.0f;
     const float CHUNK_RADIUS = 7.07f;
     
     for (auto& species : speciesList) {
+        // === Zbierz zbiór chunków blisko (detail) ===
+        // Używamy chunk center distance do podjęcia decyzji: detail czy flat
+        
+        // PASS 1: Szczegółowe modele (chunki bliskie kamery)
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, species.textureDiffuse);
         
@@ -320,22 +369,34 @@ void PlantManager::render(unsigned int shader, const glm::vec3& camPos, const gl
             for (const auto& chunk : var.chunks) {
                 glm::vec2 chunkPos2D(chunk.center.x, chunk.center.z);
                 float dist = glm::distance(chunkPos2D, camPos2D);
-                if (dist < RENDER_DIST + CHUNK_RADIUS &&
-                    sphereInFrustum(frustumPlanes, chunk.center, CHUNK_RADIUS)) {
-                    
-                    int drawInstanceCount = chunk.instanceCount;
-                    // Poprawny system LOD - zamiast ciąć modele w połowie (dziury w łodydze),
-                    // po prostu zmniejszamy liczbę rysowanych całych roślin w dalekich chunkach!
-                    // Agresywniejszy LOD — kluczowe dla wydajności
-                    if (dist > 8.0f) {
-                        drawInstanceCount = chunk.instanceCount / 6; // 16% instancji
-                    } else if (dist > 5.0f) {
-                        drawInstanceCount = chunk.instanceCount / 3; // 33%
-                    }
-                    if (drawInstanceCount < 1) drawInstanceCount = 1;
-
+                
+                bool inFrustum = sphereInFrustum(frustumPlanes, chunk.center, CHUNK_RADIUS);
+                // Nad wodą → zawsze detail (brak flat), pod wodą → detail tylko w bliskim zasięgu
+                bool useDetail = (camPos.y > 64.0f) ? (dist < RENDER_DIST + CHUNK_RADIUS) : (dist < LOD_THRESHOLD + CHUNK_RADIUS);
+                
+                if (useDetail && inFrustum) {
                     glBindVertexArray(chunk.vao);
-                    glDrawArraysInstanced(GL_TRIANGLES, 0, var.vertexCount, drawInstanceCount);
+                    glDrawArraysInstanced(GL_TRIANGLES, 0, var.vertexCount, chunk.instanceCount);
+                }
+            }
+        }
+        
+        // PASS 2: Flat billboardy (chunki dalsze, ale w zasięgu mgły)
+        if (species.flatLOD.valid && camPos.y <= 64.0f) {
+            glActiveTexture(GL_TEXTURE0);
+            glBindTexture(GL_TEXTURE_2D, species.flatLOD.textureDiffuse);
+            
+            for (const auto& chunk : species.flatLOD.chunks) {
+                glm::vec2 chunkPos2D(chunk.center.x, chunk.center.z);
+                float dist = glm::distance(chunkPos2D, camPos2D);
+                
+                bool inFrustum = sphereInFrustum(frustumPlanes, chunk.center, CHUNK_RADIUS);
+                // Flat LOD: render od progu LOD do końca widoczności
+                bool useFlat = (dist >= LOD_THRESHOLD - CHUNK_RADIUS) && (dist < RENDER_DIST + CHUNK_RADIUS);
+                
+                if (useFlat && inFrustum) {
+                    glBindVertexArray(chunk.vao);
+                    glDrawArraysInstanced(GL_TRIANGLES, 0, species.flatLOD.vertexCount, chunk.instanceCount);
                 }
             }
         }
@@ -348,7 +409,7 @@ void PlantManager::renderShadow(unsigned int shadowShader, const glm::vec3& camP
     
     glm::vec2 camPos2D(camPos.x, camPos.z);
     auto frustumPlanes = extractFrustumPlanes(vpMatrix);
-    const float SHADOW_DIST = 15.0f; // Cienie na 15m
+    const float SHADOW_DIST = 8.0f; // Cienie tylko na bliskich roślinach
     const float CHUNK_RADIUS = 7.07f;
     
     for (auto& species : speciesList) {
@@ -362,9 +423,7 @@ void PlantManager::renderShadow(unsigned int shadowShader, const glm::vec3& camP
                 if (dist < SHADOW_DIST + CHUNK_RADIUS &&
                     sphereInFrustum(frustumPlanes, chunk.center, CHUNK_RADIUS * 2.0f)) {
                     
-                    int drawInstanceCount = chunk.instanceCount;
-                    // Bardzo agresywny LOD cieni
-                    drawInstanceCount = chunk.instanceCount / 4;
+                    int drawInstanceCount = chunk.instanceCount / 3;
                     if (drawInstanceCount < 1) drawInstanceCount = 1;
 
                     glBindVertexArray(chunk.vao);
