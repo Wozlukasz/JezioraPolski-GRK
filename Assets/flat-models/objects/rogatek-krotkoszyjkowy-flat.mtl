@@ -1,7 +1,7 @@
 # Blender 5.1.1 MTL File: 'rosliny.blend'
 # www.blender.org
 
-newmtl rogatek-krótkoszyjkowy-flat0
+newmtl rogatek-krotkoszyjkowy-flat0
 Ks 0.500000 0.500000 0.500000
 Ke 0.000000 0.000000 0.000000
 Ni 1.500000
@@ -13,10 +13,10 @@ Pc 0.000000
 Pcr 0.030000
 aniso 0.000000
 anisor 0.000000
-map_Kd ../renders/rogatek-krótkoszyjkowy/rogatek-krótkoszyjkowy-flat0.png
-map_d ../renders/rogatek-krótkoszyjkowy/rogatek-krótkoszyjkowy-flat0.png
+map_Kd ../renders/rogatek-krotkoszyjkowy/rogatek-krotkoszyjkowy-flat0.png
+map_d ../renders/rogatek-krotkoszyjkowy/rogatek-krotkoszyjkowy-flat0.png
 
-newmtl rogatek-krótkoszyjkowy-flat90
+newmtl rogatek-krotkoszyjkowy-flat90
 Ks 0.500000 0.500000 0.500000
 Ke 0.000000 0.000000 0.000000
 Ni 1.500000
@@ -28,5 +28,5 @@ Pc 0.000000
 Pcr 0.030000
 aniso 0.000000
 anisor 0.000000
-map_Kd ../renders/rogatek-krótkoszyjkowy/rogatek-krótkoszyjkowy-flat90.png
-map_d ../renders/rogatek-krótkoszyjkowy/rogatek-krótkoszyjkowy-flat90.png
+map_Kd ../renders/rogatek-krotkoszyjkowy/rogatek-krotkoszyjkowy-flat90.png
+map_d ../renders/rogatek-krotkoszyjkowy/rogatek-krotkoszyjkowy-flat90.png
