@@ -198,26 +198,31 @@ void processInput(GLFWwindow* window) {
     float clampedDt = std::min(deltaTime, 1.0f / 15.0f);
     float currentSpeed = 6.0f * clampedDt; // Prędkość spaceru człowieka
 
-    glm::vec3 frontXZ = glm::normalize(glm::vec3(cameraFront.x, 0.0f, cameraFront.z));
-    glm::vec3 rightXZ = glm::normalize(glm::cross(frontXZ, cameraUp));
+    glm::vec3 front = glm::normalize(cameraFront);
+    glm::vec3 right = glm::normalize(glm::cross(front, cameraUp));
+    glm::vec3 up    = glm::vec3(0.0f, 1.0f, 0.0f);
 
     glm::vec3 newPos = cameraPos;
     if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
-        newPos += currentSpeed * frontXZ;
+        newPos += currentSpeed * front;
     if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
-        newPos -= currentSpeed * frontXZ;
+        newPos -= currentSpeed * front;
     if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
-        newPos -= currentSpeed * rightXZ;
+        newPos -= currentSpeed * right;
     if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
-        newPos += currentSpeed * rightXZ;
+        newPos += currentSpeed * right;
+    if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS)
+        newPos += currentSpeed * up;
+    if (glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS)
+        newPos -= currentSpeed * up;
 
     // Sprawdź czy nowa pozycja jest na terenie — jeśli nie, zostań w miejscu
     float newTerrainHeight = getTerrainHeight(newPos.x, newPos.z);
     if (newTerrainHeight > -900.0f) {
-        cameraPos.x = newPos.x;
-        cameraPos.z = newPos.z;
-        float targetY = newTerrainHeight + 2.0f; // Oko człowieka
-        cameraPos.y += (targetY - cameraPos.y) * 15.0f * clampedDt;
+        // Blokada przed wejściem pod ziemię (0.5m nad terenem)
+        if (newPos.y < newTerrainHeight + 0.5f) {
+            newPos.y = newTerrainHeight + 0.5f;
+        }
+        cameraPos = newPos;
     }
-    // Jeśli teren nie istnieje pod nową pozycją, kamera zostaje w miejscu
 }
