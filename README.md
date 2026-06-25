@@ -5,9 +5,9 @@ Projekt to napisana w języku C++ z użyciem OpenGL i GLSL zaawansowana aplikacj
 
 ## Skład grupy
 *Tutaj wpiszcie imiona i nazwiska członków grupy*
-- [Imię i Nazwisko 1]
-- [Imię i Nazwisko 2]
-- [Imię i Nazwisko 3]
+- Julian Szamotuła
+- Kajetan Szamotuła
+- Łukasz Woźniak
 
 ---
 
