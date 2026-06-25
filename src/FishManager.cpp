@@ -62,21 +62,26 @@ void FishManager::loadSpecies(const std::string& name, const std::string& objPat
 std::vector<glm::vec3> FishManager::generateSwimPath(glm::vec3 center, float radius,
                                                       float yMin, float yMax) {
     std::mt19937 rng(std::random_device{}());
-    std::uniform_real_distribution<float> angleDist(0.0f, 6.2832f);
-    std::uniform_real_distribution<float> radiusDist(radius * 0.5f, radius);
-    std::uniform_real_distribution<float> yDist(yMin, yMax);
+    std::uniform_real_distribution<float> radiusVar(0.85f, 1.15f);
+    std::uniform_real_distribution<float> yVar(yMin, yMax);
+    std::uniform_real_distribution<float> angleVar(-0.15f, 0.15f); // Lekkie zaburzenie kąta
 
-    // Generate 10 control points in a roughly circular path
-    int numPts = 10;
+    // Generate 12 control points in a smooth roughly-circular path
+    int numPts = 12;
     std::vector<glm::vec3> cp;
-    cp.reserve(numPts + 3); // +3 for wrapping (closed loop)
+    cp.reserve(numPts + 3);
 
     for (int i = 0; i < numPts; ++i) {
-        float angle = (float)i / numPts * 6.2832f + angleDist(rng) * 0.3f;
-        float r = radiusDist(rng);
+        float baseAngle = (float)i / numPts * 6.2832f;
+        float angle = baseAngle + angleVar(rng);
+        float r = radius * radiusVar(rng);
         float x = center.x + r * cos(angle);
         float z = center.z + r * sin(angle);
-        float y = yDist(rng);
+        // Łagodna sinusoida po Y — ryba lekko faluje w pionie
+        float yBase = (yMin + yMax) * 0.5f;
+        float yAmplitude = (yMax - yMin) * 0.3f;
+        float y = yBase + yAmplitude * sin(baseAngle * 1.5f) + (yVar(rng) - yBase) * 0.2f;
+        y = glm::clamp(y, yMin, yMax);
         cp.push_back(glm::vec3(x, y, z));
     }
 
@@ -91,25 +96,39 @@ std::vector<glm::vec3> FishManager::generateSwimPath(glm::vec3 center, float rad
 void FishManager::spawnSchool(int speciesIdx, glm::vec3 center, float radius, int count,
                                float baseSpeed, float yMin, float yMax) {
     std::mt19937 rng(std::random_device{}());
-    std::uniform_real_distribution<float> speedVar(0.8f, 1.2f);
     std::uniform_real_distribution<float> phaseDist(0.0f, 1.0f);
-    std::uniform_real_distribution<float> offsetDist(-3.0f, 3.0f);
+    
+    // 1. Generate ONE central path and PTFrames for the entire school
+    auto schoolControlPoints = generateSwimPath(center, radius, yMin, yMax);
+    auto sampled = sampleSpline(schoolControlPoints, 400);
+    auto schoolFrames = computePTFrames(sampled);
+    
+    float schoolBasePhase = phaseDist(rng);
+
+    // Dystrybucje dla lokalnych offsetów względem ścieżki (szerokość, wysokość, przód-tył)
+    std::uniform_real_distribution<float> offsetLeftRight(-4.0f, 4.0f); // Oś Z modelu (bok)
+    std::uniform_real_distribution<float> offsetUpDown(-2.0f, 2.0f);    // Oś Y modelu (góra/dół)
+    std::uniform_real_distribution<float> phaseOffset(-0.04f, 0.04f);   // Rozrzut wzdłuż ścieżki (T)
+    std::uniform_real_distribution<float> speedVar(0.98f, 1.02f);       // Minimalne odchyłki prędkości
 
     for (int i = 0; i < count; ++i) {
         Fish fish;
         fish.speciesIndex = speciesIdx;
         fish.speed = baseSpeed * speedVar(rng);
-        fish.t = phaseDist(rng);  // Start at random position on path
+        
+        fish.t = schoolBasePhase + phaseOffset(rng);
+        if (fish.t < 0.0f) fish.t += 1.0f;
+        if (fish.t >= 1.0f) fish.t -= 1.0f;
+        
         fish.phase = phaseDist(rng);
         fish.baseCenter = center;
 
-        // Each fish gets a slightly different path
-        glm::vec3 fishCenter = center + glm::vec3(offsetDist(rng), offsetDist(rng) * 0.3f, offsetDist(rng));
-        fish.controlPoints = generateSwimPath(fishCenter, radius, yMin, yMax);
-
-        // Sample the spline and compute PTF
-        auto sampled = sampleSpline(fish.controlPoints, 200);
-        fish.frames = computePTFrames(sampled);
+        // Share the same path data
+        fish.controlPoints = schoolControlPoints;
+        fish.frames = schoolFrames;
+        
+        // Z (left/right), Y (up/down), X (forward/backward local shift - set to 0 as phaseOffset handles forward/backward)
+        fish.localOffset = glm::vec3(0.0f, offsetUpDown(rng), offsetLeftRight(rng));
 
         fishes.push_back(fish);
     }
@@ -118,10 +137,10 @@ void FishManager::spawnSchool(int speciesIdx, glm::vec3 center, float radius, in
 void FishManager::init() {
     // Load fish species
     loadSpecies("Płoć",
-                "Assets/models/płoć/płoć.obj",
-                "Assets/materials/płoć/płoć-diffuse.png",
-                "Assets/materials/płoć/płoć-normal.png",
-                "Assets/materials/płoć/płoć-roughness.png");
+                "Assets/models/ploc/ploc.obj",
+                "Assets/materials/ploc/ploc-diffuse.png",
+                "Assets/materials/ploc/ploc-normal.png",
+                "Assets/materials/ploc/ploc-roughness.png");
 
     loadSpecies("Ukleja",
                 "Assets/models/ukleja/ukleja.obj",
@@ -129,56 +148,73 @@ void FishManager::init() {
                 "Assets/materials/ukleja/ukleja-normal.png",
                 "Assets/materials/ukleja/ukleja-roughness.png");
 
-    // Spawn schools of fish in the lake (underwater areas, y < 64)
-    // School 1: Płocie tuż przed graczem, by od razu je zauważył
-    spawnSchool(0, glm::vec3(0.0f, 54.0f, 6.0f), 8.0f, 6, 0.04f, 52.0f, 58.0f);
+    // Spawn schools of fish in the lake (underwater, y < 64 = waterline)
+    // Gracz startuje na (32, ~66, 38) — ławice muszą być pod nim i w zasięgu wzroku
 
-    // School 2: Ukleje blisko gracza (mniejsze, szybsze)
-    spawnSchool(1, glm::vec3(8.0f, 55.0f, -5.0f), 10.0f, 10, 0.07f, 53.0f, 59.0f);
+    // === BLISKO GRACZA — od razu widoczne po wejściu do wody ===
+    spawnSchool(0, glm::vec3(28.0f, 57.0f, 35.0f), 18.0f, 25, 0.018f, 52.0f, 61.0f);
+    spawnSchool(1, glm::vec3(22.0f, 59.0f, 30.0f), 12.0f, 30, 0.025f, 55.0f, 62.0f);
+    spawnSchool(0, glm::vec3(35.0f, 55.0f, 28.0f), 15.0f, 20, 0.020f, 50.0f, 59.0f);
 
-    // School 3: Więcej Płoci nieopodal
-    spawnSchool(0, glm::vec3(-12.0f, 53.0f, 10.0f), 10.0f, 5, 0.035f, 50.0f, 58.0f);
+    // === ŚRODEK JEZIORA — duże ławice ===
+    spawnSchool(1, glm::vec3(10.0f, 57.0f, 10.0f), 25.0f, 35, 0.022f, 53.0f, 61.0f);
+    spawnSchool(0, glm::vec3(0.0f, 54.0f, 0.0f),   30.0f, 20, 0.015f, 48.0f, 58.0f);
+    spawnSchool(1, glm::vec3(-5.0f, 58.0f, 5.0f),  20.0f, 25, 0.020f, 54.0f, 62.0f);
+
+    // === DALSZE CZĘŚCI JEZIORA ===
+    spawnSchool(0, glm::vec3(-20.0f, 53.0f, 20.0f),  22.0f, 15, 0.012f, 48.0f, 57.0f);
+    spawnSchool(1, glm::vec3(-15.0f, 56.0f, -10.0f), 18.0f, 20, 0.020f, 52.0f, 60.0f);
+    spawnSchool(0, glm::vec3(15.0f, 52.0f, -15.0f),  20.0f, 12, 0.012f, 46.0f, 56.0f);
+
+    // === GŁĘBINY — wolniejsze, tajemnicze ===
+    spawnSchool(0, glm::vec3(5.0f, 46.0f, -5.0f),   25.0f, 10, 0.008f, 42.0f, 50.0f);
+    spawnSchool(0, glm::vec3(-10.0f, 44.0f, 0.0f),  20.0f, 8,  0.006f, 40.0f, 48.0f);
 
     std::cout << "FishManager: zainicjalizowano " << fishes.size() << " ryb" << std::endl;
 }
 
 void FishManager::update(float deltaTime, const glm::vec3& cameraPos, bool feedingMode) {
+    const float FLEE_RADIUS   = 20.0f;  // Odległość, od której ryby zaczynają uciekać
+    const float FLEE_MAX_MULT = 8.0f;   // Maksymalny mnożnik prędkości podczas ucieczki
+    const float FLEE_DECAY    = 2.5f;   // Szybkość powrotu do normalnej prędkości (na sekundę)
+
     for (auto& fish : fishes) {
         if (fish.frames.empty()) continue;
 
-        float speedMult = 1.0f;
+        // Pobierz aktualną pozycję ryby z PTF (przybliżona, na podstawie fish.t)
+        int frameIdx = glm::clamp((int)(fish.t * (fish.frames.size() - 1)), 0, (int)fish.frames.size() - 1);
+        const PTFrame& frame = fish.frames[frameIdx];
+        
+        // Uwzględnij lokalny offset ryby w ławicy (przekształć do world space z grubsza)
+        glm::vec3 fishWorldPos = frame.position
+            + (-frame.binormal) * fish.localOffset.y   // Y offset -> oś "góra" ryby
+            + (-frame.normal)   * fish.localOffset.z;  // Z offset -> oś "bok" ryby
+        
+        float distToCamera = glm::distance(fishWorldPos, cameraPos);
 
-        // Feeding mode: attract fish toward camera
-        if (feedingMode && cameraPos.y < 64.0f) {
-            glm::vec3 currentPos = fish.frames[(int)(fish.t * (fish.frames.size() - 1))].position;
-            float distToCamera = glm::distance(currentPos, cameraPos);
-
-            if (distToCamera < 30.0f) {
-                // Regenerate path toward camera (smooth attraction)
-                // Shift control points slightly toward camera
-                glm::vec3 attractDir = glm::normalize(cameraPos - fish.baseCenter);
-                float attractStrength = deltaTime * 2.0f;
-
-                for (auto& cp : fish.controlPoints) {
-                    cp += attractDir * attractStrength;
+        if (cameraPos.y < 64.0f) { // Tylko pod wodą
+            if (distToCamera < FLEE_RADIUS) {
+                // Im bliżej kamery, tym silniejsza panika
+                float panicStrength = 1.0f - (distToCamera / FLEE_RADIUS);
+                float targetMult = 1.0f + (FLEE_MAX_MULT - 1.0f) * panicStrength * panicStrength;
+                
+                // Natychmiastowe przyspieszenie (maks w górę)
+                if (targetMult > fish.fleeSpeedMult) {
+                    fish.fleeSpeedMult = targetMult;
                 }
-
-                // Re-sample and recompute PTF
-                auto sampled = sampleSpline(fish.controlPoints, 200);
-                fish.frames = computePTFrames(sampled);
-
-                speedMult = 1.5f; // Fish swim faster when attracted
             }
-        } else {
-            // Zamiast przeliczać krzywe co klatkę (co było masakrycznym wąskim gardłem CPU),
-            // po prostu zostawiamy ryby na ich nowej ścieżce po karmieniu.
-            // Będą pływać wokół miejsca, w którym ostatnio był gracz.
+        }
+        
+        // Płynne wygaszanie mnożnika (powrót do spokojnego pływania)
+        if (fish.fleeSpeedMult > 1.0f) {
+            fish.fleeSpeedMult -= FLEE_DECAY * deltaTime;
+            if (fish.fleeSpeedMult < 1.0f) fish.fleeSpeedMult = 1.0f;
         }
 
         // Advance along path
-        fish.t += fish.speed * speedMult * deltaTime;
+        fish.t += fish.speed * fish.fleeSpeedMult * deltaTime;
         if (fish.t >= 1.0f) fish.t -= 1.0f;
-        if (fish.t < 0.0f) fish.t += 1.0f;
+        if (fish.t < 0.0f)  fish.t += 1.0f;
     }
 }
 
@@ -207,13 +243,35 @@ void FishManager::render(unsigned int shader, const glm::mat4& view, const glm::
 
         const auto& sp = species[fish.speciesIndex];
 
-        // Get current frame from PTF
-        int frameIdx = glm::clamp((int)(fish.t * (fish.frames.size() - 1)), 0, (int)fish.frames.size() - 1);
-        const PTFrame& frame = fish.frames[frameIdx];
+        // Get current frame with smooth interpolation
+        float floatIdx = fish.t * (fish.frames.size() - 1);
+        int frameIdx = glm::clamp((int)floatIdx, 0, (int)fish.frames.size() - 2);
+        float frac = floatIdx - frameIdx;
 
-        // Build model matrix from PTF frame + scale
-        float scale = (fish.speciesIndex == 0) ? 0.9f : 0.6f;  // Płoć i Ukleja znacznie powiększone
-        glm::mat4 model = frame.toMatrix();
+        const PTFrame& f1 = fish.frames[frameIdx];
+        const PTFrame& f2 = fish.frames[frameIdx + 1];
+
+        // Spherical interpolation for vectors, linear for position
+        glm::vec3 interpPos = glm::mix(f1.position, f2.position, frac);
+        glm::vec3 interpTan = glm::normalize(glm::mix(f1.tangent, f2.tangent, frac));
+        glm::vec3 interpNorm = glm::normalize(glm::mix(f1.normal, f2.normal, frac));
+        glm::vec3 interpBinorm = glm::normalize(glm::mix(f1.binormal, f2.binormal, frac));
+
+        // Build model matrix from interpolated frame + scale
+        float scale = (fish.speciesIndex == 0) ? 0.9f : 0.6f;
+        
+        // OBJ model: nose along -X (swims forward), dorsal fin along -Y (fix upside-down)
+        // W PTF normal to wektor w poziomie, a binormal to wektor w pionie (w dół).
+        // Aby ryba pływała pionowo (grzbietem do góry), oś Y (góra ryby) musi mapować się na -binormal.
+        glm::mat4 model = glm::mat4(
+            glm::vec4(-interpTan,    0.0f),  // X = -tangent (kierunek przodu)
+            glm::vec4(-interpBinorm, 0.0f),  // Y = -binormal (kierunek góry)
+            glm::vec4(-interpNorm,   0.0f),  // Z = -normal (prawy bok, dla zachowania prawoskrętności)
+            glm::vec4(interpPos,     1.0f)
+        );
+        
+        // Zastosuj lokalny offset (ryby trzymają się równolegle do głównej ścieżki ławicy)
+        model = glm::translate(model, fish.localOffset);
         model = glm::scale(model, glm::vec3(scale));
 
         glUniformMatrix4fv(glGetUniformLocation(shader, "model"), 1, GL_FALSE, glm::value_ptr(model));
@@ -243,11 +301,28 @@ void FishManager::renderShadow(unsigned int shadowShader, const glm::mat4& light
 
         const auto& sp = species[fish.speciesIndex];
 
-        int frameIdx = glm::clamp((int)(fish.t * (fish.frames.size() - 1)), 0, (int)fish.frames.size() - 1);
-        const PTFrame& frame = fish.frames[frameIdx];
+        // Get current frame with smooth interpolation
+        float floatIdx = fish.t * (fish.frames.size() - 1);
+        int frameIdx = glm::clamp((int)floatIdx, 0, (int)fish.frames.size() - 2);
+        float frac = floatIdx - frameIdx;
+
+        const PTFrame& f1 = fish.frames[frameIdx];
+        const PTFrame& f2 = fish.frames[frameIdx + 1];
+
+        glm::vec3 interpPos = glm::mix(f1.position, f2.position, frac);
+        glm::vec3 interpTan = glm::normalize(glm::mix(f1.tangent, f2.tangent, frac));
+        glm::vec3 interpNorm = glm::normalize(glm::mix(f1.normal, f2.normal, frac));
+        glm::vec3 interpBinorm = glm::normalize(glm::mix(f1.binormal, f2.binormal, frac));
 
         float scale = (fish.speciesIndex == 0) ? 0.9f : 0.6f;
-        glm::mat4 model = frame.toMatrix();
+        
+        glm::mat4 model = glm::mat4(
+            glm::vec4(-interpTan,    0.0f),
+            glm::vec4(-interpBinorm, 0.0f),
+            glm::vec4(-interpNorm,   0.0f),
+            glm::vec4(interpPos,     1.0f)
+        );
+        model = glm::translate(model, fish.localOffset);
         model = glm::scale(model, glm::vec3(scale));
 
         glUniformMatrix4fv(glGetUniformLocation(shadowShader, "model"), 1, GL_FALSE, glm::value_ptr(model));

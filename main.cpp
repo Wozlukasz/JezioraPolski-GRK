@@ -257,7 +257,7 @@ int main() {
 
         // Oblicz macierze kamery wcześniej — potrzebne do frustum culling w obu passach
         int width, height; glfwGetFramebufferSize(window, &width, &height);
-        glm::mat4 view = glm::translate(glm::mat4_cast(glm::conjugate(cameraOrientation)), -cameraPos);
+        glm::mat4 view = glm::lookAt(cameraPos, cameraPos + cameraFront, glm::vec3(0.0f, 1.0f, 0.0f));
         float aspect = (height == 0) ? 1.0f : (float)width / (float)height;
         glm::mat4 projection = glm::perspective(glm::radians(fov), aspect, 0.1f, 2000.0f);
         glm::mat4 vpMatrix = projection * view;
@@ -347,9 +347,10 @@ int main() {
         plantManager.render(plantShader, cameraPos, vpMatrix);
         glEnable(GL_CULL_FACE);
 
-        // Ryby
+        glDisable(GL_CULL_FACE); // Wyłącz culling, modele ryb mogą mieć odwrócony winding
         fishManager.render(fishShader, view, projection, lightSpaceMatrix, lightDir,
                            cameraPos, currentFrame, flashlightOn, cameraFront, depthMap);
+        glEnable(GL_CULL_FACE);
 
         // Bąbelki
         if (cameraPos.y < 64.0f) {

@@ -212,7 +212,7 @@ void main() {
             fogFactor = 1.0 - exp(-depth * 0.25);
         }
     } else {
-        float fogDensity = 0.25;
+        float fogDensity = 0.04; // Znacznie czystsza woda (było 0.25)
         fogFactor = 1.0 - exp(-dist * fogDensity);
     }
     

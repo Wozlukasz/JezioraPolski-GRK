@@ -1,5 +1,6 @@
 #pragma once
 #include <vector>
+#include <string>
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
 #include "ParallelTransport.h"
@@ -12,6 +13,8 @@ struct Fish {
     float speed;           // Movement speed (parameter units per second)
     float phase;           // Phase offset for schooling
     glm::vec3 baseCenter;  // Center of the swim path (for feeding attraction)
+    glm::vec3 localOffset; // Fixed offset relative to the school's central path
+    float fleeSpeedMult = 1.0f; // Multiplier when fleeing from player (decays smoothly)
 };
 
 struct FishSpecies {

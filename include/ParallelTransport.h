@@ -12,13 +12,14 @@ struct PTFrame {
     glm::vec3 normal;    // "Up" of the frame (minimal rotation from previous)
     glm::vec3 binormal;  // "Right" of the frame
 
-    // Build a 4x4 model matrix from this frame (column-major: right, up, forward, pos)
+    // Build a 4x4 model matrix from this frame
+    // OBJ model: nose along -X (if it swam backwards with +X), dorsal fin along +Y
     glm::mat4 toMatrix() const {
         return glm::mat4(
-            glm::vec4(binormal, 0.0f),
-            glm::vec4(normal,   0.0f),
-            glm::vec4(-tangent, 0.0f),  // Negate tangent so fish faces forward (OBJ convention: -Z forward)
-            glm::vec4(position, 1.0f)
+            glm::vec4(-tangent,   0.0f),  // X = -tangent (nose direction)
+            glm::vec4(normal,     0.0f),  // Y = normal  (dorsal fin / up)
+            glm::vec4(-binormal,  0.0f),  // Z = -binormal (to maintain right-handed system)
+            glm::vec4(position,   1.0f)
         );
     }
 };

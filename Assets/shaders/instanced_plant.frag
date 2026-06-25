@@ -205,7 +205,7 @@ void main() {
         }
     } else {
         // Eksponencjalna mgła — gładkie, naturalne zanikanie
-        float fogDensity = 0.25;
+        float fogDensity = 0.04;
         fogFactor = 1.0 - exp(-dist * fogDensity);
     }
     
