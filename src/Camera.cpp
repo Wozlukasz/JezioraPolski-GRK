@@ -15,13 +15,29 @@ bool firstMouse = true;
 float lastX = 400.0f;
 float lastY = 300.0f;
 
-// Total accumulated pitch to prevent looking past straight up/down
-float accumulatedPitch = glm::radians(-25.0f);
+// Euler angles
+float yaw   = -45.0f;
+float pitch = -15.0f;
+
 float fov   = 45.0f;
 
 float deltaTime = 0.0f;
 float lastFrame = 0.0f;
 bool captureMouse = true;
+
+void updateCameraVectors() {
+    glm::vec3 front;
+    front.x = cos(glm::radians(yaw)) * cos(glm::radians(pitch));
+    front.y = sin(glm::radians(pitch));
+    front.z = sin(glm::radians(yaw)) * cos(glm::radians(pitch));
+    cameraFront = glm::normalize(front);
+    cameraRight = glm::normalize(glm::cross(cameraFront, glm::vec3(0.0f, 1.0f, 0.0f)));
+    cameraUp    = glm::normalize(glm::cross(cameraRight, cameraFront));
+    
+    // Zaktualizuj kwaternion orientacji (jeśli coś jeszcze z niego korzysta)
+    cameraOrientation = glm::quat(glm::vec3(glm::radians(pitch), glm::radians(yaw), 0.0f));
+}
+
 
 // Interaction flags
 bool flashlightOn = false;
@@ -130,37 +146,20 @@ void mouse_callback(GLFWwindow* window, double xposIn, double yposIn) {
     lastX = xpos;
     lastY = ypos;
 
-    float sensitivity = 0.002f; // Wartość dla radianów
+    float sensitivity = 0.1f;
     xoffset *= sensitivity;
     yoffset *= sensitivity;
 
-    // Ograniczenie pitch (żeby nie wywrócić kamery na plecy)
-    float newPitch = accumulatedPitch + yoffset;
-    if (newPitch > glm::radians(89.0f)) {
-        yoffset = glm::radians(89.0f) - accumulatedPitch;
-        accumulatedPitch = glm::radians(89.0f);
-    } else if (newPitch < glm::radians(-89.0f)) {
-        yoffset = glm::radians(-89.0f) - accumulatedPitch;
-        accumulatedPitch = glm::radians(-89.0f);
-    } else {
-        accumulatedPitch = newPitch;
-    }
+    yaw   += xoffset;
+    pitch += yoffset;
 
-    // Yaw: obrót wokół globalnej osi Y
-    glm::quat qYaw = glm::angleAxis(-xoffset, glm::vec3(0.0f, 1.0f, 0.0f));
-    
-    // Pitch: obrót wokół lokalnej osi X (prawej)
-    cameraRight = cameraOrientation * glm::vec3(1.0f, 0.0f, 0.0f);
-    glm::quat qPitch = glm::angleAxis(yoffset, cameraRight);
-    
-    // Aktualizacja kwaternionu orientacji
-    cameraOrientation = qYaw * qPitch * cameraOrientation;
-    cameraOrientation = glm::normalize(cameraOrientation);
-    
-    // Aktualizacja wektorów
-    cameraFront = cameraOrientation * glm::vec3(0.0f, 0.0f, -1.0f);
-    cameraUp = cameraOrientation * glm::vec3(0.0f, 1.0f, 0.0f);
-    cameraRight = cameraOrientation * glm::vec3(1.0f, 0.0f, 0.0f);
+    // Ograniczenie pitch
+    if (pitch > 89.0f)
+        pitch = 89.0f;
+    if (pitch < -89.0f)
+        pitch = -89.0f;
+
+    updateCameraVectors();
 }
 
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods) {
@@ -196,7 +195,10 @@ void processInput(GLFWwindow* window) {
 
     // Ograniczenie deltaTime — zapobiega "wystrzeliwaniu" kamery przy niskim FPS
     float clampedDt = std::min(deltaTime, 1.0f / 15.0f);
-    float currentSpeed = 6.0f * clampedDt; // Prędkość spaceru człowieka
+    
+    // Boost prędkości przy użyciu klawisza CTRL
+    float speedMultiplier = (glfwGetKey(window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS) ? 3.0f : 1.0f;
+    float currentSpeed = 6.0f * clampedDt * speedMultiplier; // Prędkość spaceru / pływania
 
     glm::vec3 front = glm::normalize(cameraFront);
     glm::vec3 right = glm::normalize(glm::cross(front, cameraUp));
@@ -216,12 +218,12 @@ void processInput(GLFWwindow* window) {
     if (glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS)
         newPos -= currentSpeed * up;
 
-    // Sprawdź czy nowa pozycja jest na terenie — jeśli nie, zostań w miejscu
+    // Sprawdź czy nowa pozycja jest na terenie
     float newTerrainHeight = getTerrainHeight(newPos.x, newPos.z);
     if (newTerrainHeight > -900.0f) {
-        // Blokada przed wejściem pod ziemię (0.5m nad terenem)
-        if (newPos.y < newTerrainHeight + 0.5f) {
-            newPos.y = newTerrainHeight + 0.5f;
+        // Blokada przed wejściem pod ziemię (1.0m nad terenem)
+        if (newPos.y < newTerrainHeight + 1.0f) {
+            newPos.y = newTerrainHeight + 1.0f;
         }
         cameraPos = newPos;
     }
