@@ -66,7 +66,6 @@ void initTerrainGrid() {
         int gxMax = std::floor(maxX / cellSize);
         int gzMin = std::floor(minZ / cellSize);
         int gzMax = std::floor(maxZ / cellSize);
-        
         for (int gx = gxMin; gx <= gxMax; ++gx) {
             for (int gz = gzMin; gz <= gzMax; ++gz) {
                 int key = gx * 10000 + gz;
@@ -141,7 +140,7 @@ void mouse_callback(GLFWwindow* window, double xposIn, double yposIn) {
     yoffset *= sensitivity;
 
     // Obrót Pitch (Góra/Dół) względem LOKALNEJ osi Right (X)
-    glm::quat qPitch = glm::angleAxis(yoffset, cameraRight);
+    glm::quat qPitch = glm::angleAxis(yoffset, glm::vec3(1.0f, 0.0f, 0.0f));
     
     // Sprawdzamy limit wychylenia w pionie (ok. 89 stopni), aby nurek nie zrobił salta
     glm::quat tempOrientation = cameraOrientation * qPitch;

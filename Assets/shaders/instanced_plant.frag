@@ -51,10 +51,15 @@ vec3 fresnelSchlick(float cosTheta, vec3 F0) {
 uniform int lodFadeMode;
 uniform float lodThreshold;
 uniform float lodFadeBand;
+uniform bool isTree;
 
 void main() {
     vec4 texColor = texture(texture_diffuse1, TexCoords);
-    if(texColor.a < 0.1) discard;
+    // Bardzo wysoki próg odrzucenia przezroczystości (Alpha Testing)
+    // Modele 2D (billboardy) bez pełnego Blendingu potrzebują ostrego odcięcia (0.8),
+    // w przeciwnym razie wygładzone (anti-aliased) krawędzie z półprzezroczystym 
+    // kolorem tła rysują się jako w pełni nieprzezroczyste i udają 'prześwitujące niebo' lub obramówkę.
+    if(texColor.a < 0.8) discard;
     
     // ======== LOD Crossfade (Screen-door dithering) ========
     if (lodFadeMode > 0) {
@@ -81,6 +86,12 @@ void main() {
     // ========================================================
     
     vec3 albedo = texColor.rgb;
+    
+    if (isTree) {
+        // Ciemna sosna - mocne przyciemnienie i nadanie leśnego, głębokiego zielonego koloru.
+        // To sprawia, że białe artefakty krawędzi (z anti-aliasingu) naturalnie stają się ciemnozielone.
+        albedo *= vec3(0.2, 0.35, 0.15);
+    }
     float roughness = 0.8;  // Plants are rough
     float metallic = 0.0;   // Plants are dielectric
     

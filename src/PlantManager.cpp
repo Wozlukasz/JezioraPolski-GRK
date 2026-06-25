@@ -82,11 +82,11 @@ void PlantManager::setupChunkVAO(unsigned int baseVBO, const std::vector<glm::ma
 }
 
 void PlantManager::loadSpecies(const std::string& name, const std::string& maskPath, const std::string& tuftJsonPath, const std::string& texPath, const std::vector<std::string>& variantPaths, float scaleMult,
-                               const std::string& flatModelPath, const std::string& flatTexPath) {
+                               const std::string& flatModelPath, const std::string& flatTexPath, bool flipMainTex) {
     std::cout << "Ladowanie gatunku: " << name << std::endl;
     PlantSpecies species;
     species.name = name;
-    species.textureDiffuse = loadTexture(findAssetPath(texPath).c_str());
+    species.textureDiffuse = loadTexture(findAssetPath(texPath).c_str(), flipMainTex, true); // clamp=true
 
     // Wczytaj szczegółowe warianty modeli
     for (const auto& vp : variantPaths) {
@@ -108,7 +108,7 @@ void PlantManager::loadSpecies(const std::string& name, const std::string& maskP
             setupBaseVBO(flatVerts, species.flatLOD.baseVBO);
             species.flatLOD.vertexCount = flatVerts.size();
             if (!flatTexPath.empty()) {
-                species.flatLOD.textureDiffuse = loadTexture(findAssetPath(flatTexPath).c_str(), true); // true = flip texture vertically
+                species.flatLOD.textureDiffuse = loadTexture(findAssetPath(flatTexPath).c_str(), true, true); // flip=true, clamp=true
             } else {
                 species.flatLOD.textureDiffuse = species.textureDiffuse;
             }
@@ -117,10 +117,13 @@ void PlantManager::loadSpecies(const std::string& name, const std::string& maskP
         }
     }
 
-    int w, h, channels;
-    stbi_set_flip_vertically_on_load(false);
-    unsigned char* maskData = stbi_load(findAssetPath(maskPath).c_str(), &w, &h, &channels, 1);
-    if (!maskData) { std::cerr << "Nie udalo sie wczytac maski: " << maskPath << std::endl; return; }
+    int w = 1, h = 1, channels = 1;
+    unsigned char* maskData = nullptr;
+    if (!maskPath.empty()) {
+        stbi_set_flip_vertically_on_load(false);
+        maskData = stbi_load(findAssetPath(maskPath).c_str(), &w, &h, &channels, 1);
+        if (!maskData) { std::cerr << "Nie udalo sie wczytac maski: " << maskPath << std::endl; }
+    }
 
     json tuftJson;
     bool hasTuft = false;
@@ -157,12 +160,24 @@ void PlantManager::loadSpecies(const std::string& name, const std::string& maskP
         TerrainData td = getTerrainData(x, z);
         if (td.height < -900.0f) continue;
         
-        int px = glm::clamp((int)(td.uv.x * w), 0, w - 1);
-        int py = glm::clamp((int)((1.0f - td.uv.y) * h), 0, h - 1);
+        // Drzewa rosną tylko na suchym lądzie (brzeg > 64.5m)
+        if (maskPath.empty() && (td.height < 64.5f || td.height > 90.0f)) continue;
         
-        unsigned char maskVal = maskData[py * w + px];
+        int px = 0;
+        int py = 0;
+        unsigned char maskVal = 255;
+        
+        if (maskData) {
+            px = glm::clamp((int)(td.uv.x * w), 0, w - 1);
+            py = glm::clamp((int)((1.0f - td.uv.y) * h), 0, h - 1);
+            maskVal = maskData[py * w + px];
+        }
+        
         if (maskVal > 20) {
             float prob = maskVal / 255.0f;
+            // Drzewa (brak maski) - brzegi są wąskie, ale użytkownik prosił o dziesięciokrotne zmniejszenie gęstości sosen
+            if (maskPath.empty()) prob = 0.1f; 
+            
             std::uniform_real_distribution<float> probDist(0.0f, 1.0f);
             if (probDist(engine) > prob) continue;
 
@@ -234,11 +249,18 @@ void PlantManager::loadSpecies(const std::string& name, const std::string& maskP
 
                 float currentY = td.height;
                 
-                if (name != "Tatarak") {
+                // Nie chcemy by podwodne rośliny wystawały ponad lustro wody (63.5f)
+                // Omijamy jednak rośliny rosnące nad wodą / na brzegu!
+                if (name != "Tatarak" && name != "Drzewo (Sosna)" && name != "Osoka Brzeg") {
                     float topY = currentY + currentScaleVec.y * 1.5f;
                     if (topY > 63.5f) {
                         currentY -= (topY - 63.5f);
                     }
+                }
+                
+                // Drzewa minimalnie latają, więc obniżamy je o metr w dół
+                if (name == "Drzewo (Sosna)") {
+                    currentY -= 1.0f;
                 }
 
                 glm::mat4 m = glm::translate(glm::mat4(1.0f), glm::vec3(x, currentY, z));
@@ -288,7 +310,7 @@ void PlantManager::loadSpecies(const std::string& name, const std::string& maskP
         std::cout << "  -> Flat LOD chunks: " << species.flatLOD.chunks.size() << std::endl;
     }
 
-    stbi_image_free(maskData);
+    if (maskData) stbi_image_free(maskData);
     speciesList.push_back(species);
     std::cout << "Zaladowano gatunek " << name << " z sukcesem." << std::endl;
 }
@@ -297,42 +319,42 @@ void PlantManager::init() {
     loadSpecies("Moczarka Delikatna", 
                 "Assets/distribution-masks/maska-moczarki-delikatne.png",
                 "Assets/tufts/moczarka-delikatna-kępka.json",
-                "Assets/materials/moczarka-delikatna/moczarka-delikatna-diffuse.png",
-                {"Assets/models/moczarka-delikatna/moczarka-delikatna-1.obj", "Assets/models/moczarka-delikatna/moczarka-delikatna-2.obj"}, 2.5f,
+                "Assets/flat-models/renders/moczarka-delikatna/moczarka-delikatna-flat0.png",
+                {"Assets/flat-models/objects/moczarka-delikatna-flat.obj"}, 2.5f,
                 "Assets/flat-models/objects/moczarka-delikatna-flat.obj",
-                "Assets/flat-models/renders/moczarka-delikatna/moczarka-delikatna-flat0.png");
+                "Assets/flat-models/renders/moczarka-delikatna/moczarka-delikatna-flat0.png", true);
 
     loadSpecies("Mech Zdrojek", 
                 "Assets/distribution-masks/maska-mech-zdrojek.png",
                 "Assets/tufts/mech-zdrojek-kępka.json",
-                "Assets/materials/mech-zdrojek/mech-zdrojek-diffuse.png",
-                {"Assets/models/mech-zdrojek/mech-zdrojek-1.obj", "Assets/models/mech-zdrojek/mech-zdrojek-2.obj", "Assets/models/mech-zdrojek/mech-zdrojek-3.obj"}, 2.5f,
+                "Assets/flat-models/renders/mech-zdrojek/mech-zdrojek-flat0.png",
+                {"Assets/flat-models/objects/mech-zdrojek-flat.obj"}, 2.5f,
                 "Assets/flat-models/objects/mech-zdrojek-flat.obj",
-                "Assets/flat-models/renders/mech-zdrojek/mech-zdrojek-flat0.png");
+                "Assets/flat-models/renders/mech-zdrojek/mech-zdrojek-flat0.png", true);
 
     loadSpecies("Moczarka Kanadyjska", 
                 "Assets/distribution-masks/maska-moczarki-kanadyjskie.png",
                 "Assets/tufts/moczarka-kanadyjska-kępka.json",
-                "Assets/materials/moczarka-kanadyjska/moczarka-kanadyjska-diffuse.png",
-                {"Assets/models/moczarka-kanadyjska/moczarka-kanadyjska-1.obj", "Assets/models/moczarka-kanadyjska/moczarka-kanadyjska-2.obj", "Assets/models/moczarka-kanadyjska/moczarka-kanadyjska-3.obj"}, 2.5f,
+                "Assets/flat-models/renders/moczarka-kanadyjska/moczarka-kanadyjska-flat0.png",
+                {"Assets/flat-models/objects/moczarka-kanadyjska-flat.obj"}, 2.5f,
                 "Assets/flat-models/objects/moczarka-kanadyjska-flat.obj",
-                "Assets/flat-models/renders/moczarka-kanadyjska/moczarka-kanadyjska-flat0.png");
+                "Assets/flat-models/renders/moczarka-kanadyjska/moczarka-kanadyjska-flat0.png", true);
 
     loadSpecies("Rogatek Sztywny", 
                 "Assets/distribution-masks/maska-rogatek-sztywny.png",
                 "Assets/tufts/rogatek-sztywny-kępka.json",
-                "Assets/materials/rogatek-sztywny/rogatek-sztywny-diffuse.png",
-                {"Assets/models/rogatek-sztywny/rogatek-sztywny-1.obj", "Assets/models/rogatek-sztywny/rogatek-sztywny-2.obj"}, 2.5f,
+                "Assets/flat-models/renders/rogatek-sztywny/rogatek-sztywny-flat0.png",
+                {"Assets/flat-models/objects/rogatek-sztywny-flat.obj"}, 2.5f,
                 "Assets/flat-models/objects/rogatek-sztywny-flat.obj",
-                "Assets/flat-models/renders/rogatek-sztywny/rogatek-sztywny-flat0.png");
+                "Assets/flat-models/renders/rogatek-sztywny/rogatek-sztywny-flat0.png", true);
 
     loadSpecies("Rogatek Krotkoszyjkowy", 
                 "Assets/distribution-masks/maska-rogatek-krótkoszyjkowy.png",
                 "Assets/tufts/rogatek-krótkoszyjkowy-kępka.json",
-                "Assets/materials/rogatek-krótkoszyjkowy/rogatek-krótkoszyjkowy-diffuse.png",
-                {"Assets/models/rogatek-krótkoszyjkowy/rogatek-krótkoszyjkowy-1.obj", "Assets/models/rogatek-krótkoszyjkowy/rogatek-krótkoszyjkowy-2.obj"}, 2.5f,
+                "Assets/flat-models/renders/rogatek-krótkoszyjkowy/rogatek-krótkoszyjkowy-flat0.png",
+                {"Assets/flat-models/objects/rogatek-krótkoszyjkowy-flat.obj"}, 2.5f,
                 "Assets/flat-models/objects/rogatek-krótkoszyjkowy-flat.obj",
-                "Assets/flat-models/renders/rogatek-krótkoszyjkowy/rogatek-krótkoszyjkowy-flat0.png");
+                "Assets/flat-models/renders/rogatek-krótkoszyjkowy/rogatek-krótkoszyjkowy-flat0.png", true);
 
     // Tatarak i Osoka — brak flat modeli
     loadSpecies("Tatarak", 
@@ -346,6 +368,19 @@ void PlantManager::init() {
                 "",
                 "Assets/materials/osoka-aloesowata/osoka-aloesowata-diffuse.png",
                 {"Assets/models/osoka-aloesowata/osoka-aloesowata-11.obj", "Assets/models/osoka-aloesowata/osoka-aloesowata-12.obj"}, 2.5f);
+                
+    loadSpecies("Osoka Brzeg", 
+                "Assets/distribution-masks/maska-osoka-aloesowata-brzeg.png",
+                "",
+                "Assets/materials/osoka-aloesowata/osoka-aloesowata-diffuse.png",
+                {"Assets/models/osoka-aloesowata/osoka-aloesowata-21.obj", "Assets/models/osoka-aloesowata/osoka-aloesowata-22.obj", "Assets/models/osoka-aloesowata/osoka-aloesowata-23.obj"}, 2.5f);
+                
+    // Proste drzewa lądowe (sosny) bez maski (spawnowanie zależy od wysokości terenu)
+    loadSpecies("Drzewo (Sosna)", 
+                "", 
+                "",
+                "Assets/materials/drzewo/drzewo-diffuse.png",
+                {"Assets/models/drzewo/drzewo.obj"}, 22.0f, "", "", true); // flipMainTex = true!
 }
 
 void PlantManager::render(unsigned int shader, const glm::vec3& camPos, const glm::mat4& vpMatrix) {
@@ -364,11 +399,14 @@ void PlantManager::render(unsigned int shader, const glm::vec3& camPos, const gl
     GLint loc_lodFadeMode = glGetUniformLocation(shader, "lodFadeMode");
     GLint loc_lodThreshold = glGetUniformLocation(shader, "lodThreshold");
     GLint loc_lodFadeBand = glGetUniformLocation(shader, "lodFadeBand");
+    GLint loc_isTree = glGetUniformLocation(shader, "isTree");
     
     glUniform1f(loc_lodThreshold, LOD_THRESHOLD);
     glUniform1f(loc_lodFadeBand, FADE_BAND);
     
     for (auto& species : speciesList) {
+        glUniform1i(loc_isTree, (species.name == "Drzewo (Sosna)") ? 1 : 0);
+        
         // === Zbierz zbiór chunków blisko (detail) ===
         // Używamy chunk center distance do podjęcia decyzji: detail czy flat
         
@@ -381,12 +419,21 @@ void PlantManager::render(unsigned int shader, const glm::vec3& camPos, const gl
                 glm::vec2 chunkPos2D(chunk.center.x, chunk.center.z);
                 float dist = glm::distance(chunkPos2D, camPos2D);
                 
-                bool inFrustum = sphereInFrustum(frustumPlanes, chunk.center, CHUNK_RADIUS);
+                float currentChunkRadius = CHUNK_RADIUS;
+                if (species.name == "Drzewo (Sosna)") currentChunkRadius = 45.0f; // Drzewa są potężne, frustum culling nie może ucinać ich po liściach!
+
+                bool inFrustum = sphereInFrustum(frustumPlanes, chunk.center, currentChunkRadius);
+                
                 // Detail mode: lodFadeMode = 1
-                bool useDetail = (camPos.y > 64.0f) ? (dist < RENDER_DIST + CHUNK_RADIUS) : (dist < LOD_THRESHOLD + FADE_BAND + CHUNK_RADIUS);
+                float currentRenderDist = RENDER_DIST;
+                // Drzewa nie mają flat LOD, i muszą być widoczne zawsze (nie znikają bez względu na dystans)
+                if (species.name == "Drzewo (Sosna)") currentRenderDist = 999999.0f;
+                
+                bool useDetail = species.flatLOD.valid ? (dist < LOD_THRESHOLD) : (dist < currentRenderDist + currentChunkRadius);
                 
                 if (useDetail && inFrustum) {
-                    glUniform1i(loc_lodFadeMode, 1);
+                    // Jeśli mamy model flat, robimy twarde cięcie bez kropek. Jeśli nie, renderujemy normalnie (0).
+                    glUniform1i(loc_lodFadeMode, 0); 
                     glBindVertexArray(chunk.vao);
                     glDrawArraysInstanced(GL_TRIANGLES, 0, var.vertexCount, chunk.instanceCount);
                 }
@@ -394,7 +441,7 @@ void PlantManager::render(unsigned int shader, const glm::vec3& camPos, const gl
         }
         
         // PASS 2: Flat billboardy (chunki dalsze, ale w zasięgu mgły)
-        if (species.flatLOD.valid && camPos.y <= 64.0f) {
+        if (species.flatLOD.valid) {
             glActiveTexture(GL_TEXTURE0);
             glBindTexture(GL_TEXTURE_2D, species.flatLOD.textureDiffuse);
             
@@ -404,8 +451,8 @@ void PlantManager::render(unsigned int shader, const glm::vec3& camPos, const gl
                 
                 bool inFrustum = sphereInFrustum(frustumPlanes, chunk.center, CHUNK_RADIUS);
                 // Flat LOD: render od progu LOD do końca widoczności
-                // Flat mode: lodFadeMode = 2
-                bool useFlat = (dist >= LOD_THRESHOLD - CHUNK_RADIUS) && (dist < RENDER_DIST + CHUNK_RADIUS);
+                // Ponieważ zrezygnowaliśmy z ditheringu (kropek), robimy twardy przeskok na tańsze oświetlenie
+                bool useFlat = (dist >= LOD_THRESHOLD) && (dist < RENDER_DIST + CHUNK_RADIUS);
                 
                 if (useFlat && inFrustum) {
                     glUniform1i(loc_lodFadeMode, 2);

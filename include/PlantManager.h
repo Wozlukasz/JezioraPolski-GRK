@@ -40,7 +40,7 @@ public:
 private:
     std::vector<PlantSpecies> speciesList;
     void loadSpecies(const std::string& name, const std::string& maskPath, const std::string& tuftJsonPath, const std::string& texPath, const std::vector<std::string>& variantPaths, float scaleMult = 1.0f,
-                     const std::string& flatModelPath = "", const std::string& flatTexPath = "");
+                     const std::string& flatModelPath = "", const std::string& flatTexPath = "", bool flipMainTex = false);
     void setupBaseVBO(const std::vector<class Vertex>& vertices, unsigned int& vbo);
     void setupChunkVAO(unsigned int baseVBO, const std::vector<glm::mat4>& matrices, unsigned int& vao, unsigned int& instVBO);
 };
