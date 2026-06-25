@@ -8,7 +8,10 @@ in vec2 TexCoords;
 uniform vec3 lightDir;
 uniform vec3 viewPos;
 uniform sampler2D texWater;
+uniform sampler2D reflectionTex;
 uniform float time;
+
+in vec4 ClipSpace;
 
 vec4 hash4(vec2 p) {
     return fract(sin(vec4(1.0+dot(p,vec2(37.0,17.0)), 
@@ -88,16 +91,25 @@ void main() {
     // Mieszanie tekstury wody z kolorem bazowym
     vec3 surfaceColor = mix(deepWaterColor, shallowWaterColor, 0.4) + waterTexColor * 0.15;
     
-    // Kolor odbicia nieba (zielonkawy, przyciemniony — to jezioro, nie ocean!)
-    vec3 skyReflectionColor = vec3(0.30, 0.50, 0.45);
+    // Obliczanie współrzędnych przestrzeni ekranu (NDC) dla pobrania piksela z tekstury odbicia
+    vec2 ndc = (ClipSpace.xy / ClipSpace.w) / 2.0 + 0.5;
     
-    // Łączymy Fresnel: pod kątem prostym widać ciemne dno, pod ostrym — niebo
+    // Dodajemy małe przesunięcia dla realistycznych zniekształceń fali
+    vec2 distort = vec2(norm.x, norm.z) * 0.05; 
+    
+    // Obraz z kamery odbicia jest teraz idealnie odwrócony przez macierz skalowania -1
+    vec2 reflectionTexCoords = clamp(ndc + distort, 0.001, 0.999);
+    
+    // Pobranie koloru z wyrenderowanej wcześniej mapy odbicia (Reflection FBO)
+    vec3 skyReflectionColor = texture(reflectionTex, reflectionTexCoords).rgb;
+    
+    // Łączymy Fresnel: pod kątem prostym widać dno (prawie brak odbicia), pod ostrym — pełne lustro z drzewami!
     vec3 waterColor = mix(surfaceColor, skyReflectionColor, fresnel);
 
-    // Odblask słońca (specular) — ograniczony, naturalistyczny
+    // Odblask słońca (specular) — powiększony blask
     vec3 halfwayDir = normalize(lightVector + viewDir);
-    float spec = pow(max(dot(norm, halfwayDir), 0.0), 256.0);
-    vec3 specular = vec3(1.0, 0.97, 0.90) * spec * 0.7;
+    float spec = pow(max(dot(norm, halfwayDir), 0.0), 512.0);
+    vec3 specular = vec3(1.0, 0.95, 0.85) * spec * 1.5;
 
     // Dodatkowy miękki blask (sun glint) — rozproszone iskierki na falach
     float glint = pow(max(dot(norm, halfwayDir), 0.0), 32.0);
