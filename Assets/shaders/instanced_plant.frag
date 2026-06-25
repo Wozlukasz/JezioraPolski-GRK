@@ -17,6 +17,10 @@ uniform bool flashlightOn;
 uniform vec3 flashlightPos;
 uniform vec3 flashlightDir;
 
+uniform float clipY;
+uniform int clipMode;
+uniform bool isReflectionPass;
+
 const float PI = 3.14159265359;
 
 // ============ PBR Functions ============
@@ -54,12 +58,14 @@ uniform float lodFadeBand;
 uniform bool isTree;
 
 void main() {
+    if (clipMode == 1 && FragPos.y < clipY) discard;
+
     vec4 texColor = texture(texture_diffuse1, TexCoords);
-    // Bardzo wysoki próg odrzucenia przezroczystości (Alpha Testing)
-    // Modele 2D (billboardy) bez pełnego Blendingu potrzebują ostrego odcięcia (0.8),
-    // w przeciwnym razie wygładzone (anti-aliased) krawędzie z półprzezroczystym 
-    // kolorem tła rysują się jako w pełni nieprzezroczyste i udają 'prześwitujące niebo' lub obramówkę.
-    if(texColor.a < 0.8) discard;
+    
+    // Mipmapy powodują rozmycie kanału alpha, przez co cienkie modele tataraku znikają!
+    // Obniżamy próg dla płaskich modeli (lodFadeMode 2 i 3)
+    float alphaThreshold = (lodFadeMode == 2 || lodFadeMode == 3) ? 0.3 : 0.8;
+    if(texColor.a < alphaThreshold) discard;
     
     // ======== LOD Crossfade (Screen-door dithering) ========
     if (lodFadeMode > 0) {
@@ -193,27 +199,31 @@ void main() {
         finalColor.b *= mix(1.0, 0.5, waterDepth);
     }
     
-    // Mgła podwodna — mroczniejszy, realistyczny kolor polskiego jeziora
+    // ======== MGŁA PODWODNA ========
     float dist = length(viewPos - FragPos);
-    vec3 fogColor = vec3(0.05, 0.20, 0.15);
+    vec3 fogColor = vec3(0.05, 0.20, 0.15); // Ciemny, bagienny kolor
     float fogFactor = 0.0;
     
-    if (viewPos.y > 64.0) {
-        if (FragPos.y < 64.0) {
+    // Jeśli obiekt jest nad wodą, NIE nakładaj na niego gęstej mgły podwodnej, 
+    // nawet jeśli kamera jest pod wodą. Zamiast tego nałóż mgłę atmosferyczną.
+    if (FragPos.y > 64.0 || isReflectionPass) {
+        // Mgła atmosferyczna (nad wodą) - drzewa wtapiają się w niebo
+        fogColor = vec3(0.53, 0.81, 0.92); // Kolor jasnego nieba
+        float fogDensity = 0.003; 
+        fogFactor = 1.0 - exp(-dist * fogDensity);
+    } else {
+        // Obiekt jest pod wodą!
+        if (viewPos.y > 64.0) {
+            // Patrzymy z góry na obiekt pod wodą -> lekka mgła od głębokości
             float depth = 64.0 - FragPos.y;
             fogFactor = 1.0 - exp(-depth * 0.25);
         } else {
-            // Mgła atmosferyczna (nad wodą) - drzewa i horyzont wtapiają się w niebo
-            fogColor = vec3(0.53, 0.81, 0.92); // Kolor jasnego nieba (z main.cpp)
-            float fogDensity = 0.003; // Delikatna gęstość, odpowiednia dla dużych dystansów
+            // Zarówno kamera jak i obiekt są pod wodą -> gęsta mgła!
+            float baseDensity = 0.06;
+            float depthDensity = max(0.0, 64.0 - viewPos.y) * 0.01;
+            float fogDensity = baseDensity + depthDensity;
             fogFactor = 1.0 - exp(-dist * fogDensity);
         }
-    } else {
-        // Eksponencjalna mgła — gęstnieje wraz z dystansem oraz głębokością nurka!
-        float baseDensity = 0.06;
-        float depthDensity = max(0.0, 64.0 - viewPos.y) * 0.01;
-        float fogDensity = baseDensity + depthDensity;
-        fogFactor = 1.0 - exp(-dist * fogDensity);
     }
     
     finalColor = mix(finalColor, fogColor, fogFactor);
