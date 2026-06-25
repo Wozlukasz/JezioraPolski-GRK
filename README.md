@@ -1,110 +1,60 @@
-# Jeziora Polski — Interaktywna scena podwodna w OpenGL
+# Projekt GRK: Podwodny Świat (Jezioro Strzeszynek)
 
-Aplikacja graficzna 3D w C++/OpenGL/GLSL, przedstawiająca podwodny ekosystem polskiego jeziora Strzeszynek.
-Scena zawiera teren z realistycznym dnem, roślinnością wodną, rybami i efektami podwodnymi.
+**Motyw projektu:** Interaktywny świat podwodny (Grafika Komputerowa).  
+Projekt to napisana w języku C++ z użyciem OpenGL i GLSL zaawansowana aplikacja graficzna 3D. Aplikacja renderuje w czasie rzeczywistym mroczny, gęsty las wodorostów rosnący na dnie jeziora Strzeszynek wraz z ławicami pływających ryb.
 
-## Autorzy (w kolejności alfabetycznej):
-- Julian Szamotuła
-- Kajetan Szamotuła
-- Łukasz Woźniak
-
----
-
-## Zaimplementowane metody
-
-### Metody obowiązkowe
-| Metoda | Opis implementacji |
-|---|---|
-| **Normal Mapping** | Mapy normalne na terenie (mud, soil, grass) i rybach (płoć, ukleja) z poprawną przestrzenią styczną TBN |
-| **PBR Lighting** | Pełny Cook-Torrance BRDF: GGX NDF, Smith Geometry, Schlick Fresnel. Parametry: albedo, metallic, roughness z tekstur. Widoczne na terenie i rybach |
-| **Quaternion Camera Control** | Kamera sterowana kwaternionami — obroty yaw/pitch bez gimbal lock, płynny ruch |
-| **Shadow Mapping** | Mapa cieni z jednego światła kierunkowego, PCF 3×3, bias adaptacyjny, border clamping |
-| **Parallel Transport Frames** | Ramki transportu równoległego wyznaczające orientację ryb na ścieżkach Catmull-Rom bez nagłych obrotów (double reflection method) |
-| **Underwater Skybox/Cubemap** | Proceduralny skybox renderowany do 6-ściannej cubemapy (`GL_TEXTURE_CUBE_MAP`). Pod wodą: efekt Snella, scatter, gradient głębinowy. Nad wodą: niebo ze słońcem |
-
-### Metoda A — Masowe renderowanie z LOD
-- **Instancing**: tysiące roślin renderowanych przez `glDrawArraysInstanced` z macierzami instancji
-- **LOD**: dwa poziomy — szczegółowe modele 3D w bliskim zasięgu, flat billboardy (krzyżowe) w dalszym zasięgu
-- **Frustum culling**: chunk-based z 6-plane test
-- **Chunking**: rośliny pogrupowane w chunki 10×10m dla efektywnego culling
-
-### Metoda B — Wczytywanie zewnętrznych modeli z materiałami
-- Modele OBJ ryb: **płoć** (~1.7MB, ~20k trójkątów) i **ukleja** (~314KB)
-- Pełne PBR materiały: diffuse, normal map, roughness map
-- 7 gatunków roślin z modelami OBJ i wariantami
-- Model terenu i wody z OBJ z teksturami
+## Skład grupy
+*Tutaj wpiszcie imiona i nazwiska członków grupy*
+- [Imię i Nazwisko 1]
+- [Imię i Nazwisko 2]
+- [Imię i Nazwisko 3]
 
 ---
 
-## Interakcje
+## 🛠 Zaimplementowane Metody Obowiązkowe
 
-| Klawisz | Akcja |
-|---|---|
-| `WASD` | Ruch kamery (przód/tył/lewo/prawo) |
-| `Mysz` | Obrót kamery (kwaternionowy) |
-| `C` | Toggle przechwytywania myszy |
-| **`F`** | **Toggle latarka podwodna** — spot light zamocowany do kamery, oświetla scenę ciepłym żółtym światłem |
-| **`B`** | **Toggle bąbelki powietrza** — emituje pęcherzyki powietrza z pozycji kamery, unoszą się do góry z efektem dryftu |
-| **`E`** | **Toggle karmienie ryb** — przyciąga ryby w kierunku kamery, ryby przyspieszają i zmieniają ścieżkę |
-| `ESC` | Zamknij aplikację |
+1. **Normal mapping** – zastosowany na materiałach terenu, roślin oraz modelach ryb (przestrzeń styczna TBN jest przeliczana w vertex shaderze).
+2. **PBR lighting (Metallic/Roughness)** – kompleksowy model oświetlenia w oparciu o Cook-Torrance BRDF uwzględniający światło otoczenia (ambient), rozproszone (diffuse), lustrzane (specular GGX) oraz podpierzchniowe rozpraszanie światła (Subsurface Scattering na liściach). 
+3. **Quaternion camera control** – całkowicie zmodernizowana kamera, w której obrót odbywa się za pomocą matematyki kwaternionów, gwarantując płynny ruch i absolutny brak zjawiska "Gimbal Lock".
+4. **Shadow mapping** – dynamiczne generowanie cieni (Depth Map) z wykorzystaniem techniki PCF (Percentage-Closer Filtering 3x3) w celu wygładzenia krawędzi oraz Shadow Bias by uniknąć artefaktów (shadow acne). 
+5. **Parallel Transport Frames (PTF)** – skomplikowana animacja ryb wzdłuż gładkich krzywych Catmull-Rom. Algorytm PTF dba o to, by wektory kierunkowe na krzywej (styczna, normalna, binormalna) zachowywały płynne przejścia, dzięki czemu ryby gładko skręcają.
+6. **Underwater skybox/cubemap** – dynamicznie generowana mapa sześcienna (Cubemap) symulująca powierzchnię wody oraz mgłę z perspektywy podwodnej. Służy również jako tło (skybox) maskujące horyzont.
 
 ---
 
-## Efekty wizualne
-- Kaustyki podwodne (animowane plamy światła na dnie)
-- God rays (promienie światła przechodzące przez wodę)
-- Mgła eksponencjalna (realistyczne zanikanie widoczności pod wodą)
-- Absorpcja barw pod wodą (ciepły zielony ton)
-- Falowanie powierzchni wody (wielowarstwowe fale sinusoidalne)
-- Fresnel na powierzchni wody
-- Subsurface scattering na roślinach
-- Bąbelki z iridescencją i efektem Fresnela
-- Snell's cone na podwodnym skyboxie
+## 🚀 Metody Dodatkowe (Wybór grupy)
+
+Zgodnie z wymaganiami technicznymi, zaimplementowano poniższe techniki dodatkowe:
+
+### Metoda A: Masowe renderowanie powtarzalnych obiektów z poziomami szczegółowości
+- Autorski system `PlantManager` za pomocą tzw. **Hardware Instancing** potrafi wyrenderować do 400 000 roślin. Obszar podzielono na chunki 10x10.
+- System posiada dynamiczny **Level of Detail (LOD)** ze strefą płynnego przenikania (Crossfade/Dithering LOD). Blisko kamery modele to bogata geometria 3D, z kolei modele na dalszym planie stają się "płaskimi" billboardami 2D, redukując uderzenie w wydajność karty graficznej.
+
+### Metoda B: Wczytywanie zewnętrznych modeli z materiałami
+- System obsługujący ładowanie skomplikowanych modeli (Wavefront OBJ) wraz z kompletem załączonych materiałów i tekstur proceduralnych. Technika pozwala m.in. na zróżnicowanie podwodnego stada ryb (wczytywane Płocie i Ukleje).
 
 ---
 
-## Budowanie
+## 🎮 Interakcje i Sterowanie (Klawiszologia)
 
-### Wymagania
-- C++17
-- CMake ≥ 3.20
-- OpenGL 3.3
-- GLFW 3 (`brew install glfw` na macOS)
-- GLM (header-only, w include/)
-- stb_image (header-only, w include/)
+Aplikacja zawiera aż 3 unikalne formy interakcji z oprogramowanym światem.
 
-### Kompilacja
-```bash
-mkdir -p cmake-build-release
-cd cmake-build-release
-cmake -DCMAKE_BUILD_TYPE=Release ..
-make -j$(nproc)
-```
+### Ruch i Kamera (Quaternions)
+- `W` / `S` / `A` / `D` – Podstawowy ruch (przód, tył, na boki)
+- `Spacja` / `Lewy Shift` – Ruch w osi Y (wynurzenie / zanurzenie)
+- `Lewy CTRL` – Pływanie sprintem (x3 prędkość)
+- `Myszka` – Sterowanie kierunkiem patrzenia (Kwaterniony)
+- `C` – Uwolnienie kursora myszki / Powrót do gry
 
-### Uruchomienie
-```bash
-cd ..  # wróć do katalogu głównego projektu (wymóg dla ścieżek do Assets)
-./cmake-build-release/JezioraPolski-GRK
-```
+### Interakcje ze sceną
+- `[F]` **Latarka** – Aktywowanie światła punktowego (Flashlight/Spotlight) doczepionego do maski nurka. Skutkuje to dynamiczną zmianą warunków oświetleniowych oraz wymuszeniem przeliczenia modeli zgaszonego PBR dookoła obiektywu.
+- `[B]` **Bąbelki** – Aktywowanie sprzętowego systemu cząsteczkowego (Particle System). Z okolic gracza w stronę tafli jeziora zaczną unosić się bąble powietrza generowane za pomocą shaderów. 
+- `[E]` **Karmienie ryb (Wabik)** – Genialna interakcja modyfikująca logikę wrogów/stworzeń w locie. Kliknięcie klawisza sprawia, że sztuczna inteligencja ławic ryb modyfikuje w locie wektory krzywych Catmull-Rom. Zaczynają one szybko płynąć w Twoją stronę. Kolejne kliknięcie cofa tę czynność, pozwalając im spokojnie dryfować w swojej nowej strefie.
 
 ---
 
-## Struktura projektu
-```
-├── main.cpp                    # Główna pętla renderowania
-├── include/
-│   ├── Camera.h                # Kamera kwaternionowa
-│   ├── Model.h                 # Wczytywanie OBJ z tangent/bitangent
-│   ├── ParallelTransport.h     # PTF + Catmull-Rom spline
-│   ├── FishManager.h           # Zarządzanie rybami
-│   ├── BubbleSystem.h          # System cząsteczek bąbelków
-│   ├── CubemapGenerator.h      # Generator cubemapy
-│   ├── PlantManager.h          # Instancyjne renderowanie roślin
-│   └── Shader.h / Texture.h / Utils.h
-├── src/                        # Implementacje .cpp
-├── Assets/
-│   ├── shaders/                # Shadery GLSL (terrain, water, fish, bubble, skybox, shadow)
-│   ├── models/                 # Modele OBJ (teren, woda, ryby, rośliny)
-│   └── materials/              # Tekstury PBR (diffuse, normal, roughness)
-└── CMakeLists.txt
-```
+## 💿 Uruchomienie projektu
+1. Sklonuj repozytorium GitHub na dysk twardy.
+2. Zbuduj aplikację (C++) w środowisku obsługującym CMake (np. CLion / Visual Studio).
+3. Projekt wymaga bibliotek systemowych do renderowania okna (dostarczonych jako statyczne w repozytorium bądź zależnych w systemie paczek).
+4. Wszystkie asety graficzne znajdują się w folderze `Assets`. Upewnij się, że "Working Directory" ustawione jest na korzeń (root) repozytorium.

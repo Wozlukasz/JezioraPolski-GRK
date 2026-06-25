@@ -130,14 +130,14 @@ void FishManager::init() {
                 "Assets/materials/ukleja/ukleja-roughness.png");
 
     // Spawn schools of fish in the lake (underwater areas, y < 64)
-    // School 1: Płocie near center of lake
-    spawnSchool(0, glm::vec3(0.0f, 58.0f, 0.0f), 25.0f, 5, 0.04f, 52.0f, 62.0f);
+    // School 1: Płocie tuż przed graczem, by od razu je zauważył
+    spawnSchool(0, glm::vec3(0.0f, 54.0f, 6.0f), 8.0f, 6, 0.04f, 52.0f, 58.0f);
 
-    // School 2: Ukleje (smaller, faster)
-    spawnSchool(1, glm::vec3(20.0f, 60.0f, -15.0f), 15.0f, 8, 0.07f, 56.0f, 63.0f);
+    // School 2: Ukleje blisko gracza (mniejsze, szybsze)
+    spawnSchool(1, glm::vec3(8.0f, 55.0f, -5.0f), 10.0f, 10, 0.07f, 53.0f, 59.0f);
 
-    // School 3: More Płocie in another area
-    spawnSchool(0, glm::vec3(-30.0f, 55.0f, 25.0f), 20.0f, 4, 0.035f, 50.0f, 60.0f);
+    // School 3: Więcej Płoci nieopodal
+    spawnSchool(0, glm::vec3(-12.0f, 53.0f, 10.0f), 10.0f, 5, 0.035f, 50.0f, 58.0f);
 
     std::cout << "FishManager: zainicjalizowano " << fishes.size() << " ryb" << std::endl;
 }
@@ -170,21 +170,9 @@ void FishManager::update(float deltaTime, const glm::vec3& cameraPos, bool feedi
                 speedMult = 1.5f; // Fish swim faster when attracted
             }
         } else {
-            // Slowly drift control points back toward base center
-            glm::vec3 currentCenter(0);
-            for (const auto& cp : fish.controlPoints) currentCenter += cp;
-            currentCenter /= (float)fish.controlPoints.size();
-
-            glm::vec3 driftDir = fish.baseCenter - currentCenter;
-            float driftLen = glm::length(driftDir);
-            if (driftLen > 1.0f) {
-                driftDir = glm::normalize(driftDir) * deltaTime * 0.5f;
-                for (auto& cp : fish.controlPoints) {
-                    cp += driftDir;
-                }
-                auto sampled = sampleSpline(fish.controlPoints, 200);
-                fish.frames = computePTFrames(sampled);
-            }
+            // Zamiast przeliczać krzywe co klatkę (co było masakrycznym wąskim gardłem CPU),
+            // po prostu zostawiamy ryby na ich nowej ścieżce po karmieniu.
+            // Będą pływać wokół miejsca, w którym ostatnio był gracz.
         }
 
         // Advance along path
@@ -224,7 +212,7 @@ void FishManager::render(unsigned int shader, const glm::mat4& view, const glm::
         const PTFrame& frame = fish.frames[frameIdx];
 
         // Build model matrix from PTF frame + scale
-        float scale = (fish.speciesIndex == 0) ? 0.4f : 0.25f;  // Płoć bigger, Ukleja smaller
+        float scale = (fish.speciesIndex == 0) ? 0.9f : 0.6f;  // Płoć i Ukleja znacznie powiększone
         glm::mat4 model = frame.toMatrix();
         model = glm::scale(model, glm::vec3(scale));
 
@@ -258,7 +246,7 @@ void FishManager::renderShadow(unsigned int shadowShader, const glm::mat4& light
         int frameIdx = glm::clamp((int)(fish.t * (fish.frames.size() - 1)), 0, (int)fish.frames.size() - 1);
         const PTFrame& frame = fish.frames[frameIdx];
 
-        float scale = (fish.speciesIndex == 0) ? 0.4f : 0.25f;
+        float scale = (fish.speciesIndex == 0) ? 0.9f : 0.6f;
         glm::mat4 model = frame.toMatrix();
         model = glm::scale(model, glm::vec3(scale));
 

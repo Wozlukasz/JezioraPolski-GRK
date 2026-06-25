@@ -1,3 +1,3 @@
 #pragma once
 
-unsigned int loadTexture(const char* path);
+unsigned int loadTexture(const char* path, bool flip = false);

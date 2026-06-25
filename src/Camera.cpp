@@ -15,10 +15,6 @@ bool firstMouse = true;
 float lastX = 400.0f;
 float lastY = 300.0f;
 
-// Euler angles
-float yaw   = -45.0f;
-float pitch = -15.0f;
-
 float fov   = 45.0f;
 
 float deltaTime = 0.0f;
@@ -26,16 +22,10 @@ float lastFrame = 0.0f;
 bool captureMouse = true;
 
 void updateCameraVectors() {
-    glm::vec3 front;
-    front.x = cos(glm::radians(yaw)) * cos(glm::radians(pitch));
-    front.y = sin(glm::radians(pitch));
-    front.z = sin(glm::radians(yaw)) * cos(glm::radians(pitch));
-    cameraFront = glm::normalize(front);
-    cameraRight = glm::normalize(glm::cross(cameraFront, glm::vec3(0.0f, 1.0f, 0.0f)));
-    cameraUp    = glm::normalize(glm::cross(cameraRight, cameraFront));
-    
-    // Zaktualizuj kwaternion orientacji (jeśli coś jeszcze z niego korzysta)
-    cameraOrientation = glm::quat(glm::vec3(glm::radians(pitch), glm::radians(yaw), 0.0f));
+    // Oblicz wektory kierunkowe kamery bezpośrednio z aktualnego kwaternionu (brak Gimbal Lock)
+    cameraFront = glm::normalize(cameraOrientation * glm::vec3(0.0f, 0.0f, -1.0f));
+    cameraUp    = glm::normalize(cameraOrientation * glm::vec3(0.0f, 1.0f, 0.0f));
+    cameraRight = glm::normalize(cameraOrientation * glm::vec3(1.0f, 0.0f, 0.0f));
 }
 
 
@@ -146,18 +136,26 @@ void mouse_callback(GLFWwindow* window, double xposIn, double yposIn) {
     lastX = xpos;
     lastY = ypos;
 
-    float sensitivity = 0.1f;
+    float sensitivity = 0.002f; // Czułość dla radianów
     xoffset *= sensitivity;
     yoffset *= sensitivity;
 
-    yaw   += xoffset;
-    pitch += yoffset;
+    // Obrót Pitch (Góra/Dół) względem LOKALNEJ osi Right (X)
+    glm::quat qPitch = glm::angleAxis(yoffset, cameraRight);
+    
+    // Sprawdzamy limit wychylenia w pionie (ok. 89 stopni), aby nurek nie zrobił salta
+    glm::quat tempOrientation = cameraOrientation * qPitch;
+    glm::vec3 testFront = glm::normalize(tempOrientation * glm::vec3(0.0f, 0.0f, -1.0f));
+    if (testFront.y < 0.99f && testFront.y > -0.99f) {
+        cameraOrientation = tempOrientation;
+    }
 
-    // Ograniczenie pitch
-    if (pitch > 89.0f)
-        pitch = 89.0f;
-    if (pitch < -89.0f)
-        pitch = -89.0f;
+    // Obrót Yaw (Lewo/Prawo) względem GLOBALNEJ osi Up (Y), zapobiega przechyleniom bocznym (roll)
+    glm::quat qYaw = glm::angleAxis(-xoffset, glm::vec3(0.0f, 1.0f, 0.0f));
+    cameraOrientation = qYaw * cameraOrientation;
+    
+    // Normalizacja zapobiega gromadzeniu błędów zmiennoprzecinkowych
+    cameraOrientation = glm::normalize(cameraOrientation);
 
     updateCameraVectors();
 }

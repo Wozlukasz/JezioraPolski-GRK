@@ -48,9 +48,37 @@ vec3 fresnelSchlick(float cosTheta, vec3 F0) {
     return F0 + (1.0 - F0) * pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
 }
 
+uniform int lodFadeMode;
+uniform float lodThreshold;
+uniform float lodFadeBand;
+
 void main() {
     vec4 texColor = texture(texture_diffuse1, TexCoords);
     if(texColor.a < 0.1) discard;
+    
+    // ======== LOD Crossfade (Screen-door dithering) ========
+    if (lodFadeMode > 0) {
+        float dist = length(viewPos - FragPos);
+        float alpha = 1.0;
+        
+        if (lodFadeMode == 1) {
+            // Model detaliczny znika w miarę oddalania się w strefie FADE_BAND
+            alpha = 1.0 - clamp((dist - lodThreshold) / lodFadeBand, 0.0, 1.0);
+        } else if (lodFadeMode == 2) {
+            // Model płaski pojawia się w miarę oddalania się w strefie FADE_BAND
+            alpha = clamp((dist - lodThreshold) / lodFadeBand, 0.0, 1.0);
+        }
+        
+        if (alpha < 1.0) {
+            // Pseudo-losowy szum na podstawie współrzędnych ekranu do ditheringu
+            vec2 fragCoord = gl_FragCoord.xy;
+            float dither = fract(sin(dot(fragCoord, vec2(12.9898, 78.233))) * 43758.5453);
+            if (alpha < dither) {
+                discard;
+            }
+        }
+    }
+    // ========================================================
     
     vec3 albedo = texColor.rgb;
     float roughness = 0.8;  // Plants are rough
@@ -61,38 +89,53 @@ void main() {
     vec3 L = normalize(lightDir);
     vec3 H = normalize(V + L);
     
-    // ====== Cook-Torrance BRDF ======
-    vec3 F0 = vec3(0.04);
+    vec3 finalColor;
     
-    float NDF = DistributionGGX(norm, H, roughness);
-    float G   = GeometrySmith(norm, V, L, roughness);
-    vec3  F   = fresnelSchlick(max(dot(H, V), 0.0), F0);
-    
-    vec3 numerator = NDF * G * F;
-    float denominator = 4.0 * max(dot(norm, V), 0.0) * max(dot(norm, L), 0.0) + 0.0001;
-    vec3 specular = numerator / denominator;
-    
-    vec3 kS = F;
-    vec3 kD = vec3(1.0) - kS;
-    kD *= 1.0 - metallic;
-    
-    // Two-sided lighting for leaves
-    float NdotL_front = max(dot(norm, L), 0.0);
-    float NdotL_back = max(dot(-norm, L), 0.0);
-    float NdotL = NdotL_front + NdotL_back * 0.4;
-    
-    // Subsurface Scattering (sunlight through leaves)
-    float sss = pow(max(dot(V, -L), 0.0), 3.0) * 0.40;
-    vec3 sssColor = albedo * vec3(0.9, 1.0, 0.4);
-    
-    vec3 lightColor = vec3(1.0, 0.95, 0.85) * 2.5;
-    vec3 Lo = (kD * albedo / PI + specular) * lightColor * NdotL;
-    
-    float shadow = 0.0;
-    // Jasny ambient
-    vec3 ambient = vec3(0.35, 0.40, 0.30) * albedo;
-    
-    vec3 finalColor = ambient + (1.0 - shadow) * Lo + sss * sssColor;
+    // Optymalizacja wydajnościowa GPU: Modele płaskie (lodFadeMode == 2) używają uproszczonego oświetlenia
+    if (lodFadeMode == 2) {
+        float NdotL_front = max(dot(norm, L), 0.0);
+        float NdotL_back = max(dot(-norm, L), 0.0);
+        float NdotL = NdotL_front + NdotL_back * 0.4;
+        
+        vec3 lightColor = vec3(1.0, 0.95, 0.85) * 2.5;
+        vec3 ambient = vec3(0.35, 0.40, 0.30) * albedo;
+        vec3 diffuse = albedo / PI * lightColor * NdotL;
+        
+        finalColor = ambient + diffuse;
+    } else {
+        // ====== Cook-Torrance BRDF ======
+        vec3 F0 = vec3(0.04);
+        
+        float NDF = DistributionGGX(norm, H, roughness);
+        float G   = GeometrySmith(norm, V, L, roughness);
+        vec3  F   = fresnelSchlick(max(dot(H, V), 0.0), F0);
+        
+        vec3 numerator = NDF * G * F;
+        float denominator = 4.0 * max(dot(norm, V), 0.0) * max(dot(norm, L), 0.0) + 0.0001;
+        vec3 specular = numerator / denominator;
+        
+        vec3 kS = F;
+        vec3 kD = vec3(1.0) - kS;
+        kD *= 1.0 - metallic;
+        
+        // Two-sided lighting for leaves
+        float NdotL_front = max(dot(norm, L), 0.0);
+        float NdotL_back = max(dot(-norm, L), 0.0);
+        float NdotL = NdotL_front + NdotL_back * 0.4;
+        
+        // Subsurface Scattering (sunlight through leaves)
+        float sss = pow(max(dot(V, -L), 0.0), 3.0) * 0.40;
+        vec3 sssColor = albedo * vec3(0.9, 1.0, 0.4);
+        
+        vec3 lightColor = vec3(1.0, 0.95, 0.85) * 2.5;
+        vec3 Lo = (kD * albedo / PI + specular) * lightColor * NdotL;
+        
+        float shadow = 0.0;
+        // Jasny ambient
+        vec3 ambient = vec3(0.35, 0.40, 0.30) * albedo;
+        
+        finalColor = ambient + (1.0 - shadow) * Lo + sss * sssColor;
+    }
     
     // ====== Flashlight ======
     if (flashlightOn) {
@@ -151,7 +194,7 @@ void main() {
         }
     } else {
         // Eksponencjalna mgła — gładkie, naturalne zanikanie
-        float fogDensity = 0.12;
+        float fogDensity = 0.25;
         fogFactor = 1.0 - exp(-dist * fogDensity);
     }
     
