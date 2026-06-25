@@ -349,12 +349,12 @@ void PlantManager::init() {
                 "Assets/flat-models/renders/rogatek-sztywny/rogatek-sztywny-flat0.png", true);
 
     loadSpecies("Rogatek Krotkoszyjkowy", 
-                "Assets/distribution-masks/maska-rogatek-krótkoszyjkowy.png",
-                "Assets/tufts/rogatek-krótkoszyjkowy-kępka.json",
-                "Assets/flat-models/renders/rogatek-krótkoszyjkowy/rogatek-krótkoszyjkowy-flat0.png",
-                {"Assets/flat-models/objects/rogatek-krótkoszyjkowy-flat.obj"}, 2.5f,
-                "Assets/flat-models/objects/rogatek-krótkoszyjkowy-flat.obj",
-                "Assets/flat-models/renders/rogatek-krótkoszyjkowy/rogatek-krótkoszyjkowy-flat0.png", true);
+                "Assets/distribution-masks/maska-rogatek-krotkoszyjkowy.png",
+                "Assets/tufts/rogatek-krotkoszyjkowy-kepka.json",
+                "Assets/flat-models/renders/rogatek-krotkoszyjkowy/rogatek-krotkoszyjkowy-flat0.png",
+                {"Assets/flat-models/objects/rogatek-krotkoszyjkowy-flat.obj"}, 2.5f,
+                "Assets/flat-models/objects/rogatek-krotkoszyjkowy-flat.obj",
+                "Assets/flat-models/renders/rogatek-krotkoszyjkowy/rogatek-krotkoszyjkowy-flat0.png", true);
 
     // Tatarak i Osoka — brak flat modeli
     loadSpecies("Tatarak", 
