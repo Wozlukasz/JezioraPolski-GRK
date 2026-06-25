@@ -85,9 +85,9 @@ void main() {
         }
         
         if (alpha < 1.0) {
-            // Pseudo-losowy szum na podstawie współrzędnych ekranu do ditheringu
-            vec2 fragCoord = gl_FragCoord.xy;
-            float dither = fract(sin(dot(fragCoord, vec2(12.9898, 78.233))) * 43758.5453);
+            // Znacznie szybszy ordered dithering (szachownica), zysk FPS zamiast sin()
+            ivec2 pos = ivec2(gl_FragCoord.xy);
+            float dither = ((pos.x & 1) ^ (pos.y & 1)) == 1 ? 0.75 : 0.25;
             if (alpha < dither) {
                 discard;
             }
@@ -195,36 +195,59 @@ void main() {
         finalColor += vec3(0.20, 0.25, 0.22) * rayStrength;
     }
     
-    // Korekta barw pod wodą — woda absorbuje czerwień, zachowuje niebieski
-    if (FragPos.y < 64.0) {
-        float waterDepth = clamp((64.0 - FragPos.y) / 20.0, 0.0, 1.0);
-        finalColor.r *= mix(1.0, 0.55, waterDepth);
-        finalColor.g *= mix(1.0, 0.90, waterDepth);
-        finalColor.b *= mix(1.0, 0.95, waterDepth);
-    }
-    
     // ======== MGŁA PODWODNA ========
     float dist = length(viewPos - FragPos);
-    vec3 fogColor = vec3(0.06, 0.18, 0.25);
+    vec3 fogColor = vec3(0.18, 0.35, 0.22);
     float fogFactor = 0.0;
     
-    if (FragPos.y > 64.0 || isReflectionPass) {
+    if (isReflectionPass) {
         fogColor = vec3(0.53, 0.81, 0.92);
-        float fogDensity = 0.003; 
-        fogFactor = 1.0 - exp(-dist * fogDensity);
-    } else {
-        if (viewPos.y > 64.0) {
-            float depth = 64.0 - FragPos.y;
-            fogFactor = 1.0 - exp(-depth * 0.12);
+        fogFactor = 1.0 - exp(-dist * 0.003);
+    } else if (viewPos.y < 64.0) {
+        // Kamerzysta jest pod wodą
+        if (FragPos.y > 64.0) {
+            // Fragment nad wodą (drzewa, roślinność na brzegu). 
+            // Liczymy dystans promienia biegnącego pod wodą (od powierzchni do kamery).
+            vec3 dir = normalize(FragPos - viewPos);
+            float underwaterDist = (64.0 - viewPos.y) / max(dir.y, 0.001);
+            
+            float fogDensity = 0.05 + max(0.0, 64.0 - viewPos.y) * 0.005;
+            fogFactor = 1.0 - exp(-underwaterDist * fogDensity);
+            
+            fogColor = mix(vec3(0.18, 0.35, 0.22), vec3(0.10, 0.24, 0.16), clamp((64.0 - viewPos.y)/30.0, 0.0, 1.0));
+            
+            // Smugi słoneczne maskujące obiekty w mętnej wodzie
+            vec3 sunDir = normalize(vec3(0.6, 0.9, 0.4));
+            float sunDot = max(dot(dir, sunDir), 0.0);
+            float ray1 = sin(dir.x * 40.0 + time * 1.5) * cos(dir.z * 35.0 - time * 1.1);
+            float ray2 = sin(dir.x * 25.0 - time * 0.9) * cos(dir.z * 20.0 + time * 1.3);
+            float rays = smoothstep(0.6, 1.0, (ray1 + ray2) * 0.5 + 0.5);
+            fogColor += vec3(0.9, 1.0, 0.8) * rays * pow(sunDot, 2.0) * 0.8;
+            
         } else {
-            float baseDensity = 0.025;
-            float depthDensity = max(0.0, 64.0 - viewPos.y) * 0.003;
-            float fogDensity = baseDensity + depthDensity;
+            // Fragment pod wodą (cały dystans przebiega w wodzie)
+            float fogDensity = 0.05 + max(0.0, 64.0 - viewPos.y) * 0.005;
             fogFactor = 1.0 - exp(-dist * fogDensity);
+            
+            float waterDepth = clamp((64.0 - FragPos.y) / 30.0, 0.0, 1.0);
+            fogColor = mix(vec3(0.18, 0.35, 0.22), vec3(0.10, 0.24, 0.16), waterDepth);
+        }
+    } else {
+        // Kamerzysta jest nad wodą
+        if (FragPos.y > 64.0) {
+            fogColor = vec3(0.53, 0.81, 0.92);
+            fogFactor = 1.0 - exp(-dist * 0.003);
+        } else {
+            fogFactor = 1.0 - exp(-(64.0 - FragPos.y) * 0.12);
+            float waterDepth = clamp((64.0 - FragPos.y) / 30.0, 0.0, 1.0);
+            fogColor = mix(vec3(0.18, 0.35, 0.22), vec3(0.10, 0.24, 0.16), waterDepth);
         }
     }
     
     finalColor = mix(finalColor, fogColor, fogFactor);
     
-    FragColor = vec4(finalColor, texColor.a);
+    // Kluczowa poprawka: Wymuszamy alpha = 1.0. Przezroczystość roślin i tak jest
+    // obcinana (discard) testem alpha. Wypuszczenie mniejszego alpha powodowało
+    // mieszanie się (blending) z wyczyszczonym ciemnym tłem jeziora i tworzyło ciemne krawędzie!
+    FragColor = vec4(finalColor, 1.0);
 }

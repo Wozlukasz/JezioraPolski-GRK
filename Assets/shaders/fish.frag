@@ -73,14 +73,14 @@ float ShadowCalculation(vec4 fragPosLightSpace, vec3 normal, vec3 lightVec) {
     
     float shadow = 0.0;
     vec2 texelSize = 1.0 / textureSize(shadowMap, 0);
-    // 5x5 PCF — 25 próbek, miękkie krawędzie cienia
-    for(int x = -2; x <= 2; ++x) {
-        for(int y = -2; y <= 2; ++y) {
+    // 3x3 PCF — 9 próbek (znacznie lepsza wydajność)
+    for(int x = -1; x <= 1; ++x) {
+        for(int y = -1; y <= 1; ++y) {
             float pcfDepth = texture(shadowMap, projCoords.xy + vec2(x, y) * texelSize).r; 
             shadow += currentDepth - bias > pcfDepth ? 1.0 : 0.0;
         }    
     }
-    shadow /= 25.0;
+    shadow /= 9.0;
     return shadow;
 }
 
@@ -169,11 +169,11 @@ void main() {
     }
     
     // ====== Kaustyki podwodne ======
-    if (FragPos.y < 63.5 && FragPos.y > 50.0) {
+    if (FragPos.y < 63.5) {
         float ci = caustics(FragPos, time);
-        float depthFade = clamp((63.5 - FragPos.y) / 12.0, 0.0, 1.0);
-        float cs = ci * (1.0 - depthFade) * 0.35;
-        finalColor += vec3(0.12, 0.22, 0.06) * cs * (1.0 - shadow);
+        float depthFade = clamp((63.5 - FragPos.y) / 30.0, 0.0, 1.0);
+        float cs = ci * (1.0 - depthFade) * 0.45;
+        finalColor += vec3(0.15, 0.28, 0.10) * cs * (1.0 - shadow);
     }
     
     // ====== God rays ======
@@ -194,17 +194,9 @@ void main() {
         finalColor += vec3(0.20, 0.25, 0.22) * rayStrength;
     }
     
-    // ====== Underwater color absorption — woda absorbuje czerwień, zachowuje niebieski ======
-    if (FragPos.y < 64.0) {
-        float waterDepth = clamp((64.0 - FragPos.y) / 20.0, 0.0, 1.0);
-        finalColor.r *= mix(1.0, 0.75, waterDepth);
-        finalColor.g *= mix(1.0, 0.95, waterDepth);
-        finalColor.b *= mix(1.0, 1.00, waterDepth);
-    }
-    
     // ====== Underwater fog ======
     float dist = length(viewPos - FragPos);
-    vec3 fogColor = vec3(0.06, 0.18, 0.25); 
+    vec3 fogColor = vec3(0.12, 0.28, 0.18); // Bardziej realistyczny, mętno-zielonkawy
     float fogFactor = 0.0;
     
     if (viewPos.y > 64.0) {
@@ -213,11 +205,16 @@ void main() {
             fogFactor = 1.0 - exp(-depth * 0.12);
         }
     } else {
-        // Zmniejszona gęstość — widoczność ok 35-40m zamiast 17m
-        float baseDensity = 0.025;
-        float depthDensity = max(0.0, 64.0 - viewPos.y) * 0.003;
+        float baseDensity = 0.05; // Poprawiony realizm głębi, ok. 15m do zamglenia
+        float depthDensity = max(0.0, 64.0 - viewPos.y) * 0.005;
         float fogDensity = baseDensity + depthDensity;
         fogFactor = 1.0 - exp(-dist * fogDensity);
+    }
+    
+    // Absorpcja barw pod wodą — zredukowane by dno było jaśniejsze
+    if (FragPos.y < 64.0) {
+        float waterDepth = clamp((64.0 - FragPos.y) / 30.0, 0.0, 1.0);
+        fogColor = mix(vec3(0.18, 0.35, 0.22), vec3(0.10, 0.24, 0.16), waterDepth);
     }
     
     finalColor = mix(finalColor, fogColor, fogFactor);

@@ -96,16 +96,21 @@ void BubbleSystem::render(const glm::mat4& view, const glm::mat4& projection,
 
     glBindVertexArray(vao);
 
+    GLint loc_bubblePos = glGetUniformLocation(shader, "bubblePos");
+    GLint loc_bubbleSize = glGetUniformLocation(shader, "bubbleSize");
+    GLint loc_bubbleAlpha = glGetUniformLocation(shader, "bubbleAlpha");
+    GLint loc_bubbleAge = glGetUniformLocation(shader, "bubbleAge");
+
     for (const auto& b : bubbles) {
         if (!b.active) continue;
 
         float alpha = 1.0f - (b.age / b.lifetime);
         alpha = glm::clamp(alpha, 0.0f, 1.0f);
 
-        glUniform3fv(glGetUniformLocation(shader, "bubblePos"), 1, glm::value_ptr(b.position));
-        glUniform1f(glGetUniformLocation(shader, "bubbleSize"), b.size);
-        glUniform1f(glGetUniformLocation(shader, "bubbleAlpha"), alpha);
-        glUniform1f(glGetUniformLocation(shader, "bubbleAge"), b.age);
+        glUniform3fv(loc_bubblePos, 1, glm::value_ptr(b.position));
+        glUniform1f(loc_bubbleSize, b.size);
+        glUniform1f(loc_bubbleAlpha, alpha);
+        glUniform1f(loc_bubbleAge, b.age);
 
         glDrawArrays(GL_TRIANGLES, 0, 6);
     }

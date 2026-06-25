@@ -313,6 +313,7 @@ int main() {
   GLint loc_skybox_viewPos = glGetUniformLocation(skyboxShader, "viewPos");
   GLint loc_skybox_useCubemap =
       glGetUniformLocation(skyboxShader, "useCubemap");
+  GLint loc_skybox_time = glGetUniformLocation(skyboxShader, "time");
 
   // Nowe uniformy dla kaustyk podwodnych i SSS
   GLint loc_terrain_time = glGetUniformLocation(terrainShader, "time");
@@ -607,6 +608,7 @@ int main() {
     glUniformMatrix4fv(loc_skybox_projection, 1, GL_FALSE,
                        glm::value_ptr(projection));
     glUniform3fv(loc_skybox_viewPos, 1, glm::value_ptr(cameraPos));
+    glUniform1f(loc_skybox_time, currentFrame);
 
     // Use cubemap when underwater
     bool useUnderwaterCubemap = (cameraPos.y < 64.0f);

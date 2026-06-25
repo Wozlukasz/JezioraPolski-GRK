@@ -144,30 +144,22 @@ void main() {
         float cosTheta = max(dot(viewDir, vec3(0.0, 1.0, 0.0)), 0.0);
 
         // --- Okno Snella ---
-        // Kąt graniczny wody: sin(θc) = 1/1.33 → θc ≈ 48.75°
-        // Gdy cosTheta > cos(48.75°) ≈ 0.66 jesteśmy w oknie
         float snellCosThreshold = 0.66; // cos(48.75 deg)
         float snellWindow = smoothstep(snellCosThreshold - 0.1, snellCosThreshold + 0.15, cosTheta);
 
-        // Kolor nieba widoczny przez okno Snella — jasny, niebiesko-biały
-        vec3 skyColor = vec3(0.65, 0.82, 0.88);
-        // Słońce w oknie Snella
-        vec3 sunDir = normalize(lightDir);
-        float sunDot = max(dot(viewDir, sunDir), 0.0);
-        float sunDisc = pow(sunDot, 60.0) * 2.0;
-        skyColor += vec3(1.0, 0.95, 0.8) * sunDisc;
+        // Tło jest liczone przez same obiekty (skybox, drzewa), więc nie rysujemy własnego nieba
 
         // --- Kaustyki animowane na spodzie tafli ---
         vec2 causticUV = FragPos.xz * 0.05;
         float caus = causticPattern(causticUV, time);
-        // Kaustyki widać tylko w oknie Snella (tam pada światło słoneczne)
         vec3 causticColor = vec3(0.30, 0.55, 0.30) * caus * snellWindow;
 
-        // Ciemna otoczka poza oknem — efekt totalnego odbicia wewnętrznego
-        vec3 darkEdge = vec3(0.01, 0.03, 0.06);
+        // Ciemna otoczka poza oknem — kolor mgły
+        vec3 darkEdge = vec3(0.18, 0.35, 0.22);
 
-        // Złóż: okno + ciemna otoczka
-        waterColor = mix(darkEdge, skyColor, snellWindow);
+        // Kolor nieba i obiektów będzie teraz po prostu prześwitywał z tła, my dodajemy tylko refleksy!
+        // Złóż: okno (czyste, przezroczyste) + ciemna otoczka
+        waterColor = mix(darkEdge, vec3(1.0), snellWindow);
         waterColor += causticColor;
 
         // Dodatkowe iskierki — falowanie zniekształca okno
@@ -177,14 +169,14 @@ void main() {
 
         specular = vec3(0.0);
 
-        // Przezroczystość: w oknie Snella tafla jest prawie przezroczysta (widać niebo),
-        // poza oknem — nieprzezroczysta (totalnie odbijające)
-        alpha = mix(0.92, 0.25, snellWindow);
+        // Przezroczystość: w oknie Snella tafla jest mocno przezroczysta by pokazać niebo i obiekty nadwodne,
+        // które samodzielnie liczą swoją mgłę!
+        alpha = mix(0.95, 0.15, snellWindow);
 
-        // Lekka mgła tylko w dużej odległości — nie zasłaniaj bliskiej tafli
-        vec3 fogColor = vec3(0.06, 0.18, 0.25);
+        // Mgła dopasowana do reszty podwodnego środowiska
+        vec3 fogColor = vec3(0.18, 0.35, 0.22);
         float dist = length(viewPos - FragPos);
-        float fogDensity = 0.015; // bardzo niska gęstość — nie zamazuj tafli z bliska
+        float fogDensity = 0.03;
         float fogFactor = 1.0 - exp(-dist * fogDensity);
         waterColor = mix(waterColor, fogColor, fogFactor * 0.5);
 
