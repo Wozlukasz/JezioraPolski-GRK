@@ -14,7 +14,8 @@ struct Fish {
     float phase;           // Phase offset for schooling
     glm::vec3 baseCenter;  // Center of the swim path (for feeding attraction)
     glm::vec3 localOffset; // Fixed offset relative to the school's central path
-    float fleeSpeedMult = 1.0f; // Multiplier when fleeing from player (decays smoothly)
+    float panicLevel = 0.0f; // Smooth [0, 1] panic level
+    glm::vec3 scatterDir;  // Unique random direction to scatter when panicked
 };
 
 struct FishSpecies {

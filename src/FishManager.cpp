@@ -110,6 +110,7 @@ void FishManager::spawnSchool(int speciesIdx, glm::vec3 center, float radius, in
     std::uniform_real_distribution<float> offsetUpDown(-2.0f, 2.0f);    // Oś Y modelu (góra/dół)
     std::uniform_real_distribution<float> phaseOffset(-0.04f, 0.04f);   // Rozrzut wzdłuż ścieżki (T)
     std::uniform_real_distribution<float> speedVar(0.98f, 1.02f);       // Minimalne odchyłki prędkości
+    std::uniform_real_distribution<float> scatterDist(-1.0f, 1.0f);     // Losowy kierunek ucieczki
 
     for (int i = 0; i < count; ++i) {
         Fish fish;
@@ -129,6 +130,12 @@ void FishManager::spawnSchool(int speciesIdx, glm::vec3 center, float radius, in
         
         // Z (left/right), Y (up/down), X (forward/backward local shift - set to 0 as phaseOffset handles forward/backward)
         fish.localOffset = glm::vec3(0.0f, offsetUpDown(rng), offsetLeftRight(rng));
+        fish.panicLevel = 0.0f;
+        
+        // Unikalny kierunek rozpraszania się podczas paniki
+        glm::vec3 scatter = glm::vec3(scatterDist(rng), scatterDist(rng) * 0.5f, scatterDist(rng));
+        if (glm::length(scatter) > 0.001f) scatter = glm::normalize(scatter);
+        fish.scatterDir = scatter;
 
         fishes.push_back(fish);
     }
@@ -174,45 +181,43 @@ void FishManager::init() {
 }
 
 void FishManager::update(float deltaTime, const glm::vec3& cameraPos, bool feedingMode) {
-    const float FLEE_RADIUS   = 20.0f;  // Odległość, od której ryby zaczynają uciekać
-    const float FLEE_MAX_MULT = 8.0f;   // Maksymalny mnożnik prędkości podczas ucieczki
-    const float FLEE_DECAY    = 2.5f;   // Szybkość powrotu do normalnej prędkości (na sekundę)
+    const float FLEE_RADIUS   = 18.0f;  // Odległość paniki
+    const float PANIC_BUILDUP = 4.0f;   // Szybkość narastania paniki (0 do 1 w 0.25s)
+    const float PANIC_DECAY   = 0.5f;   // Szybkość opadania paniki (1 do 0 w 2s)
 
     for (auto& fish : fishes) {
         if (fish.frames.empty()) continue;
 
-        // Pobierz aktualną pozycję ryby z PTF (przybliżona, na podstawie fish.t)
         int frameIdx = glm::clamp((int)(fish.t * (fish.frames.size() - 1)), 0, (int)fish.frames.size() - 1);
         const PTFrame& frame = fish.frames[frameIdx];
         
-        // Uwzględnij lokalny offset ryby w ławicy (przekształć do world space z grubsza)
         glm::vec3 fishWorldPos = frame.position
-            + (-frame.binormal) * fish.localOffset.y   // Y offset -> oś "góra" ryby
-            + (-frame.normal)   * fish.localOffset.z;  // Z offset -> oś "bok" ryby
+            + (-frame.binormal) * fish.localOffset.y
+            + (-frame.normal)   * fish.localOffset.z;
         
         float distToCamera = glm::distance(fishWorldPos, cameraPos);
+        float targetPanic = 0.0f;
 
-        if (cameraPos.y < 64.0f) { // Tylko pod wodą
-            if (distToCamera < FLEE_RADIUS) {
-                // Im bliżej kamery, tym silniejsza panika
-                float panicStrength = 1.0f - (distToCamera / FLEE_RADIUS);
-                float targetMult = 1.0f + (FLEE_MAX_MULT - 1.0f) * panicStrength * panicStrength;
-                
-                // Natychmiastowe przyspieszenie (maks w górę)
-                if (targetMult > fish.fleeSpeedMult) {
-                    fish.fleeSpeedMult = targetMult;
-                }
-            }
+        if (cameraPos.y < 64.0f && distToCamera < FLEE_RADIUS) {
+            // targetPanic rośnie im bliżej środka strefy jesteśmy
+            targetPanic = 1.0f - (distToCamera / FLEE_RADIUS);
+            targetPanic = glm::clamp(targetPanic, 0.0f, 1.0f);
         }
         
-        // Płynne wygaszanie mnożnika (powrót do spokojnego pływania)
-        if (fish.fleeSpeedMult > 1.0f) {
-            fish.fleeSpeedMult -= FLEE_DECAY * deltaTime;
-            if (fish.fleeSpeedMult < 1.0f) fish.fleeSpeedMult = 1.0f;
+        // Płynna interpolacja aktualnego poziomu paniki ryby
+        if (targetPanic > fish.panicLevel) {
+            fish.panicLevel += PANIC_BUILDUP * deltaTime;
+            if (fish.panicLevel > targetPanic) fish.panicLevel = targetPanic;
+        } else {
+            fish.panicLevel -= PANIC_DECAY * deltaTime;
+            if (fish.panicLevel < targetPanic) fish.panicLevel = targetPanic;
         }
 
+        // Predkość zależy od paniki (max 6x szybciej)
+        float currentFleeMult = 1.0f + (5.0f * fish.panicLevel);
+
         // Advance along path
-        fish.t += fish.speed * fish.fleeSpeedMult * deltaTime;
+        fish.t += fish.speed * currentFleeMult * deltaTime;
         if (fish.t >= 1.0f) fish.t -= 1.0f;
         if (fish.t < 0.0f)  fish.t += 1.0f;
     }
@@ -272,6 +277,13 @@ void FishManager::render(unsigned int shader, const glm::mat4& view, const glm::
         
         // Zastosuj lokalny offset (ryby trzymają się równolegle do głównej ścieżki ławicy)
         model = glm::translate(model, fish.localOffset);
+        
+        // Dodaj efekt rozpływania się ławicy przy panice
+        if (fish.panicLevel > 0.01f) {
+            // Płynne odskakiwanie ryby do max 6 metrów w jej scatterDir
+            model = glm::translate(model, fish.scatterDir * (fish.panicLevel * 6.0f));
+        }
+
         model = glm::scale(model, glm::vec3(scale));
 
         glUniformMatrix4fv(glGetUniformLocation(shader, "model"), 1, GL_FALSE, glm::value_ptr(model));
@@ -323,6 +335,12 @@ void FishManager::renderShadow(unsigned int shadowShader, const glm::mat4& light
             glm::vec4(interpPos,     1.0f)
         );
         model = glm::translate(model, fish.localOffset);
+        
+        // Dodaj efekt rozpływania się ławicy przy panice dla cieni
+        if (fish.panicLevel > 0.01f) {
+            model = glm::translate(model, fish.scatterDir * (fish.panicLevel * 6.0f));
+        }
+
         model = glm::scale(model, glm::vec3(scale));
 
         glUniformMatrix4fv(glGetUniformLocation(shadowShader, "model"), 1, GL_FALSE, glm::value_ptr(model));

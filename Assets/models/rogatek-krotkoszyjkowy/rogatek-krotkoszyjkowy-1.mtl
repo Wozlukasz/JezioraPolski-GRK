@@ -1,7 +1,7 @@
 # Blender 5.1.1 MTL File: 'rosliny.blend'
 # www.blender.org
 
-newmtl rogatek-krótkoszyjkowy-imagetexture
+newmtl rogatek-krotkoszyjkowy-imagetexture
 Ks 0.500000 0.500000 0.500000
 Ke 0.000000 0.000000 0.000000
 Ni 1.500000
@@ -13,6 +13,6 @@ Pc 0.000000
 Pcr 0.030000
 aniso 0.000000
 anisor 0.000000
-map_Kd ../../materials/rogatek-krótkoszyjkowy/rogatek-krótkoszyjkowy-diffuse.png
-map_Pr ../../materials/rogatek-krótkoszyjkowy/rogatek-krótkoszyjkowy-roughness.png
-map_Bump -bm 1.000000 ../../materials/rogatek-krótkoszyjkowy/rogatek-krótkoszyjkowy-normal.png
+map_Kd ../../materials/rogatek-krotkoszyjkowy/rogatek-krotkoszyjkowy-diffuse.png
+map_Pr ../../materials/rogatek-krotkoszyjkowy/rogatek-krotkoszyjkowy-roughness.png
+map_Bump -bm 1.000000 ../../materials/rogatek-krotkoszyjkowy/rogatek-krotkoszyjkowy-normal.png
