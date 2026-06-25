@@ -23,6 +23,11 @@ float deltaTime = 0.0f;
 float lastFrame = 0.0f;
 bool captureMouse = true;
 
+// Interaction flags
+bool flashlightOn = false;
+bool bubblesActive = false;
+bool feedingMode = false;
+
 extern std::vector<Vertex> globalTerrainVertices;
 
 #include <unordered_map>
@@ -167,6 +172,21 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
         } else {
             glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
         }
+    }
+    // Flashlight toggle
+    if (key == GLFW_KEY_F && action == GLFW_PRESS) {
+        flashlightOn = !flashlightOn;
+        std::cout << "Latarka: " << (flashlightOn ? "ON" : "OFF") << std::endl;
+    }
+    // Bubbles toggle
+    if (key == GLFW_KEY_B && action == GLFW_PRESS) {
+        bubblesActive = !bubblesActive;
+        std::cout << "Babelki: " << (bubblesActive ? "ON" : "OFF") << std::endl;
+    }
+    // Feeding mode toggle
+    if (key == GLFW_KEY_E && action == GLFW_PRESS) {
+        feedingMode = !feedingMode;
+        std::cout << "Karmienie ryb: " << (feedingMode ? "ON" : "OFF") << std::endl;
     }
 }
 

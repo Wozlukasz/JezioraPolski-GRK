@@ -12,6 +12,9 @@
 #include "Shader.h"
 #include "Camera.h"
 #include "PlantManager.h"
+#include "FishManager.h"
+#include "BubbleSystem.h"
+#include "CubemapGenerator.h"
 #include "stb_image.h"
 
 std::vector<Vertex> globalTerrainVertices;
@@ -48,6 +51,9 @@ int main() {
     unsigned int shadowShader = createShaderProgramFromFiles("Assets/shaders/shadow.vert", "Assets/shaders/shadow.frag");
     unsigned int plantShader = createShaderProgramFromFiles("Assets/shaders/instanced_plant.vert", "Assets/shaders/instanced_plant.frag");
     unsigned int shadowPlantShader = createShaderProgramFromFiles("Assets/shaders/shadow_instanced.vert", "Assets/shaders/shadow_instanced.frag");
+    unsigned int fishShader = createShaderProgramFromFiles("Assets/shaders/fish.vert", "Assets/shaders/fish.frag");
+    unsigned int fishShadowShader = createShaderProgramFromFiles("Assets/shaders/fish_shadow.vert", "Assets/shaders/fish_shadow.frag");
+    unsigned int bubbleShader = createShaderProgramFromFiles("Assets/shaders/bubble.vert", "Assets/shaders/bubble.frag");
 
     // Skybox vertices
     float skyboxVertices[] = {
@@ -104,6 +110,14 @@ int main() {
     PlantManager plantManager;
     plantManager.init();
 
+    // Fish Manager - PTF animated fish
+    FishManager fishManager;
+    fishManager.init();
+
+    // Bubble System
+    BubbleSystem bubbleSystem;
+    bubbleSystem.init();
+
     // Shadow Map FBO
     const unsigned int SHADOW_WIDTH = 2048, SHADOW_HEIGHT = 2048;
     unsigned int depthMapFBO;
@@ -136,6 +150,7 @@ int main() {
     unsigned int mudRough = loadTexture(findAssetPath("Assets/materials/strzeszynek/teren-jezioro/mud/mud roughness.bmp").c_str());
     unsigned int grassRough = loadTexture(findAssetPath("Assets/materials/strzeszynek/teren-jezioro/grass/PX_Ground_Grass_02_roughness.jpg").c_str());
 
+    // Terrain shader texture units
     glUseProgram(terrainShader);
     glUniform1i(glGetUniformLocation(terrainShader, "splatMap"), 0);
     glUniform1i(glGetUniformLocation(terrainShader, "texMud"), 1);
@@ -158,7 +173,21 @@ int main() {
     glUseProgram(shadowPlantShader);
     glUniform1i(glGetUniformLocation(shadowPlantShader, "texture_diffuse1"), 0);
 
+    // Fish shader texture units
+    glUseProgram(fishShader);
+    glUniform1i(glGetUniformLocation(fishShader, "albedoMap"), 0);
+    glUniform1i(glGetUniformLocation(fishShader, "normalMap"), 1);
+    glUniform1i(glGetUniformLocation(fishShader, "roughnessMap"), 2);
+    glUniform1i(glGetUniformLocation(fishShader, "shadowMap"), 3);
+
+    // Skybox cubemap texture unit
+    glUseProgram(skyboxShader);
+    glUniform1i(glGetUniformLocation(skyboxShader, "skyboxCubemap"), 0);
+
     glm::vec3 lightDir(0.6f, 0.9f, 0.4f);
+
+    // Generate underwater cubemap from the procedural skybox
+    unsigned int underwaterCubemap = generateUnderwaterCubemap(skyboxShader, skyboxVAO, 512);
 
     // ---- Cache uniform locations (avoid per-frame string lookups) ----
     GLint loc_shadow_lightSpaceMatrix = glGetUniformLocation(shadowShader, "lightSpaceMatrix");
@@ -171,12 +200,18 @@ int main() {
     GLint loc_terrain_lightSpaceMatrix = glGetUniformLocation(terrainShader, "lightSpaceMatrix");
     GLint loc_terrain_lightDir = glGetUniformLocation(terrainShader, "lightDir");
     GLint loc_terrain_viewPos = glGetUniformLocation(terrainShader, "viewPos");
+    GLint loc_terrain_flashlightOn = glGetUniformLocation(terrainShader, "flashlightOn");
+    GLint loc_terrain_flashlightPos = glGetUniformLocation(terrainShader, "flashlightPos");
+    GLint loc_terrain_flashlightDir = glGetUniformLocation(terrainShader, "flashlightDir");
 
     GLint loc_plant_view = glGetUniformLocation(plantShader, "view");
     GLint loc_plant_projection = glGetUniformLocation(plantShader, "projection");
     GLint loc_plant_lightSpaceMatrix = glGetUniformLocation(plantShader, "lightSpaceMatrix");
     GLint loc_plant_lightDir = glGetUniformLocation(plantShader, "lightDir");
     GLint loc_plant_viewPos = glGetUniformLocation(plantShader, "viewPos");
+    GLint loc_plant_flashlightOn = glGetUniformLocation(plantShader, "flashlightOn");
+    GLint loc_plant_flashlightPos = glGetUniformLocation(plantShader, "flashlightPos");
+    GLint loc_plant_flashlightDir = glGetUniformLocation(plantShader, "flashlightDir");
 
     GLint loc_water_model = glGetUniformLocation(waterShader, "model");
     GLint loc_water_view = glGetUniformLocation(waterShader, "view");
@@ -188,10 +223,15 @@ int main() {
     GLint loc_skybox_view = glGetUniformLocation(skyboxShader, "view");
     GLint loc_skybox_projection = glGetUniformLocation(skyboxShader, "projection");
     GLint loc_skybox_viewPos = glGetUniformLocation(skyboxShader, "viewPos");
+    GLint loc_skybox_useCubemap = glGetUniformLocation(skyboxShader, "useCubemap");
 
     // Nowe uniformy dla kaustyk podwodnych i SSS
     GLint loc_terrain_time = glGetUniformLocation(terrainShader, "time");
     GLint loc_plant_time = glGetUniformLocation(plantShader, "time");
+
+    // Bubble emission timer
+    float bubbleEmitTimer = 0.0f;
+    const float BUBBLE_EMIT_INTERVAL = 0.15f;
 
     while (!glfwWindowShouldClose(window)) {
         float currentFrame = static_cast<float>(glfwGetTime());
@@ -199,6 +239,19 @@ int main() {
         lastFrame = currentFrame;
 
         processInput(window);
+
+        // Update fish
+        fishManager.update(deltaTime, cameraPos, feedingMode);
+
+        // Update bubbles
+        bubbleSystem.update(deltaTime);
+        if (bubblesActive && cameraPos.y < 64.0f) {
+            bubbleEmitTimer += deltaTime;
+            if (bubbleEmitTimer >= BUBBLE_EMIT_INTERVAL) {
+                bubbleEmitTimer = 0.0f;
+                bubbleSystem.emit(cameraPos + cameraFront * 0.5f, 3);
+            }
+        }
 
         glm::mat4 model = glm::mat4(1.0f);
 
@@ -229,8 +282,10 @@ int main() {
         // Cienie roślin
         glUseProgram(shadowPlantShader);
         glUniformMatrix4fv(loc_shadowPlant_lightSpaceMatrix, 1, GL_FALSE, glm::value_ptr(lightSpaceMatrix));
-        // Renderowanie cieni roślin (zawsze, żeby było widać cienie z brzegu)
         plantManager.renderShadow(shadowPlantShader, cameraPos, vpMatrix);
+
+        // Cienie ryb
+        fishManager.renderShadow(fishShadowShader, lightSpaceMatrix);
         
         glEnable(GL_CULL_FACE);
         glCullFace(GL_BACK);
@@ -265,6 +320,11 @@ int main() {
         glUniform3fv(loc_terrain_lightDir, 1, glm::value_ptr(lightDir));
         glUniform3fv(loc_terrain_viewPos, 1, glm::value_ptr(cameraPos));
         glUniform1f(loc_terrain_time, currentFrame);
+        glUniform1i(loc_terrain_flashlightOn, flashlightOn ? 1 : 0);
+        if (flashlightOn) {
+            glUniform3fv(loc_terrain_flashlightPos, 1, glm::value_ptr(cameraPos));
+            glUniform3fv(loc_terrain_flashlightDir, 1, glm::value_ptr(cameraFront));
+        }
         glBindVertexArray(terrainVAO);
         glDrawArrays(GL_TRIANGLES, 0, globalTerrainVertices.size());
 
@@ -277,11 +337,26 @@ int main() {
         glUniform3fv(loc_plant_lightDir, 1, glm::value_ptr(lightDir));
         glUniform3fv(loc_plant_viewPos, 1, glm::value_ptr(cameraPos));
         glUniform1f(loc_plant_time, currentFrame);
+        glUniform1i(loc_plant_flashlightOn, flashlightOn ? 1 : 0);
+        if (flashlightOn) {
+            glUniform3fv(loc_plant_flashlightPos, 1, glm::value_ptr(cameraPos));
+            glUniform3fv(loc_plant_flashlightDir, 1, glm::value_ptr(cameraFront));
+        }
         
         glDisable(GL_CULL_FACE); // Wyłącz culling dla dwustronnych liści
-        // Rośliny renderowane zawsze, aby tatarak przy brzegu był widoczny
         plantManager.render(plantShader, cameraPos, vpMatrix);
         glEnable(GL_CULL_FACE);
+
+        // Ryby
+        fishManager.render(fishShader, view, projection, lightSpaceMatrix, lightDir,
+                           cameraPos, currentFrame, flashlightOn, cameraFront, depthMap);
+
+        // Bąbelki
+        if (cameraPos.y < 64.0f) {
+            glDepthMask(GL_FALSE); // Don't write depth for transparent bubbles
+            bubbleSystem.render(view, projection, cameraPos, bubbleShader);
+            glDepthMask(GL_TRUE);
+        }
 
         // Woda
         glUseProgram(waterShader);
@@ -302,6 +377,15 @@ int main() {
         glUniformMatrix4fv(loc_skybox_view, 1, GL_FALSE, glm::value_ptr(skyView));
         glUniformMatrix4fv(loc_skybox_projection, 1, GL_FALSE, glm::value_ptr(projection));
         glUniform3fv(loc_skybox_viewPos, 1, glm::value_ptr(cameraPos));
+        
+        // Use cubemap when underwater
+        bool useUnderwaterCubemap = (cameraPos.y < 64.0f);
+        glUniform1i(loc_skybox_useCubemap, useUnderwaterCubemap ? 1 : 0);
+        if (useUnderwaterCubemap) {
+            glActiveTexture(GL_TEXTURE0);
+            glBindTexture(GL_TEXTURE_CUBE_MAP, underwaterCubemap);
+        }
+        
         glBindVertexArray(skyboxVAO);
         glDrawArrays(GL_TRIANGLES, 0, 36);
         glDepthFunc(GL_LESS); 

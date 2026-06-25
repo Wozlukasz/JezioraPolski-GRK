@@ -4,18 +4,23 @@ out vec4 FragColor;
 in vec3 TexCoords;
 
 uniform vec3 viewPos;
+uniform samplerCube skyboxCubemap;
+uniform bool useCubemap;
 
 void main() {
     vec3 dir = normalize(TexCoords);
     
     bool underwater = (viewPos.y < 64.0);
     
-    if (underwater) {
-        // === Pod wodą ===
-        // Ciepła, jasna zieleń jak na zdjęciu referencyjnym polskiego jeziora
-        vec3 colorTop = vec3(0.25, 0.55, 0.30);      // Jasna, ciepła zieleń u góry (światło z powierzchni)
-        vec3 colorMid = vec3(0.15, 0.40, 0.18);      // Środek — soczysty, żywy zielony
-        vec3 colorBottom = vec3(0.08, 0.20, 0.06);    // Ciemniejszy dół, ale wciąż ciepłozielony
+    if (underwater && useCubemap) {
+        // === Pod wodą: sample z cubemapy ===
+        vec3 cubemapColor = texture(skyboxCubemap, dir).rgb;
+        FragColor = vec4(cubemapColor, 1.0);
+    } else if (underwater) {
+        // === Pod wodą: proceduralny fallback ===
+        vec3 colorTop = vec3(0.25, 0.55, 0.30);
+        vec3 colorMid = vec3(0.15, 0.40, 0.18);
+        vec3 colorBottom = vec3(0.08, 0.20, 0.06);
 
         float t = clamp(dir.y * 0.5 + 0.5, 0.0, 1.0);
         vec3 finalColor;
@@ -25,21 +30,18 @@ void main() {
             finalColor = mix(colorBottom, colorMid, t * 2.0);
         }
         
-        // Efekt Snella — jasna plama u góry (słońce widziane z dołu)
+        // Efekt Snella
         vec3 sunDir = normalize(vec3(0.6, 0.9, 0.4));
         float snellAngle = max(dir.y, 0.0);
         float snellCone = smoothstep(0.35, 0.8, snellAngle);
         
-        // Wewnątrz stożka Snella — jaśniejszy, cieplejszy
         vec3 snellColor = vec3(0.35, 0.60, 0.30);
         finalColor = mix(finalColor, snellColor, snellCone * 0.5);
         
-        // Słońce widoczne przez stożek
         float sunDot = max(dot(dir, sunDir), 0.0);
         float sunGlow = pow(sunDot, 16.0) * 0.6 * snellCone;
         finalColor += vec3(0.5, 0.6, 0.3) * sunGlow;
         
-        // Drobne cząsteczki unoszące się w wodzie
         float scatter = pow(max(dot(dir, sunDir), 0.0), 3.0) * 0.08;
         finalColor += vec3(0.15, 0.20, 0.08) * scatter;
         

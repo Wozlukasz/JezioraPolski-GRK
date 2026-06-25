@@ -29,6 +29,11 @@ float getTerrainHeight(float x, float z);
 extern float deltaTime;
 extern float lastFrame;
 
+// Interaction flags
+extern bool flashlightOn;   // [F] Toggle underwater flashlight
+extern bool bubblesActive;   // [B] Toggle bubble emission
+extern bool feedingMode;     // [E] Toggle fish feeding/attraction mode
+
 void mouse_callback(GLFWwindow* window, double xpos, double ypos);
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods);
 void processInput(GLFWwindow* window);

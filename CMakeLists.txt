@@ -31,6 +31,9 @@ set(SRC_FILES
     src/Texture.cpp
     src/Utils.cpp
     src/PlantManager.cpp
+    src/FishManager.cpp
+    src/BubbleSystem.cpp
+    src/CubemapGenerator.cpp
     src/glad.c
 )
 add_executable(JezioraPolski-GRK main.cpp ${SRC_FILES})
