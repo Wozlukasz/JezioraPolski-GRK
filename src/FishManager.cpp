@@ -159,23 +159,28 @@ void FishManager::init() {
     // Gracz startuje na (32, ~66, 38) — ławice muszą być pod nim i w zasięgu wzroku
 
     // === BLISKO GRACZA — od razu widoczne po wejściu do wody ===
-    spawnSchool(0, glm::vec3(28.0f, 57.0f, 35.0f), 18.0f, 25, 0.018f, 52.0f, 61.0f);
-    spawnSchool(1, glm::vec3(22.0f, 59.0f, 30.0f), 12.0f, 30, 0.025f, 55.0f, 62.0f);
-    spawnSchool(0, glm::vec3(35.0f, 55.0f, 28.0f), 15.0f, 20, 0.020f, 50.0f, 59.0f);
+    spawnSchool(0, glm::vec3(28.0f, 57.0f, 35.0f), 18.0f, 50, 0.007f, 52.0f, 61.0f);
+    spawnSchool(1, glm::vec3(22.0f, 59.0f, 30.0f), 12.0f, 60, 0.009f, 55.0f, 62.0f);
+    spawnSchool(0, glm::vec3(35.0f, 55.0f, 28.0f), 15.0f, 45, 0.008f, 50.0f, 59.0f);
 
     // === ŚRODEK JEZIORA — duże ławice ===
-    spawnSchool(1, glm::vec3(10.0f, 57.0f, 10.0f), 25.0f, 35, 0.022f, 53.0f, 61.0f);
-    spawnSchool(0, glm::vec3(0.0f, 54.0f, 0.0f),   30.0f, 20, 0.015f, 48.0f, 58.0f);
-    spawnSchool(1, glm::vec3(-5.0f, 58.0f, 5.0f),  20.0f, 25, 0.020f, 54.0f, 62.0f);
+    spawnSchool(1, glm::vec3(10.0f, 57.0f, 10.0f), 25.0f, 80, 0.008f, 53.0f, 61.0f);
+    spawnSchool(0, glm::vec3(0.0f, 54.0f, 0.0f),   30.0f, 60, 0.006f, 48.0f, 58.0f);
+    spawnSchool(1, glm::vec3(-5.0f, 58.0f, 5.0f),  20.0f, 55, 0.007f, 54.0f, 62.0f);
 
     // === DALSZE CZĘŚCI JEZIORA ===
-    spawnSchool(0, glm::vec3(-20.0f, 53.0f, 20.0f),  22.0f, 15, 0.012f, 48.0f, 57.0f);
-    spawnSchool(1, glm::vec3(-15.0f, 56.0f, -10.0f), 18.0f, 20, 0.020f, 52.0f, 60.0f);
-    spawnSchool(0, glm::vec3(15.0f, 52.0f, -15.0f),  20.0f, 12, 0.012f, 46.0f, 56.0f);
+    spawnSchool(0, glm::vec3(-20.0f, 53.0f, 20.0f),  22.0f, 40, 0.005f, 48.0f, 57.0f);
+    spawnSchool(1, glm::vec3(-15.0f, 56.0f, -10.0f), 18.0f, 45, 0.007f, 52.0f, 60.0f);
+    spawnSchool(0, glm::vec3(15.0f, 52.0f, -15.0f),  20.0f, 35, 0.005f, 46.0f, 56.0f);
+
+    // === NOWE DODATKOWE ŁAWICE ===
+    spawnSchool(1, glm::vec3(40.0f, 54.0f, 10.0f),   15.0f, 40, 0.008f, 48.0f, 58.0f);
+    spawnSchool(0, glm::vec3(-35.0f, 56.0f, -30.0f),  22.0f, 45, 0.006f, 50.0f, 60.0f);
+    spawnSchool(1, glm::vec3(5.0f, 58.0f, 45.0f),    18.0f, 50, 0.007f, 53.0f, 62.0f);
 
     // === GŁĘBINY — wolniejsze, tajemnicze ===
-    spawnSchool(0, glm::vec3(5.0f, 46.0f, -5.0f),   25.0f, 10, 0.008f, 42.0f, 50.0f);
-    spawnSchool(0, glm::vec3(-10.0f, 44.0f, 0.0f),  20.0f, 8,  0.006f, 40.0f, 48.0f);
+    spawnSchool(0, glm::vec3(5.0f, 46.0f, -5.0f),   25.0f, 30, 0.003f, 42.0f, 50.0f);
+    spawnSchool(0, glm::vec3(-10.0f, 44.0f, 0.0f),  20.0f, 25, 0.002f, 40.0f, 48.0f);
 
     std::cout << "FishManager: zainicjalizowano " << fishes.size() << " ryb" << std::endl;
 }
@@ -198,10 +203,22 @@ void FishManager::update(float deltaTime, const glm::vec3& cameraPos, bool feedi
         float distToCamera = glm::distance(fishWorldPos, cameraPos);
         float targetPanic = 0.0f;
 
-        if (cameraPos.y < 64.0f && distToCamera < FLEE_RADIUS) {
-            // targetPanic rośnie im bliżej środka strefy jesteśmy
-            targetPanic = 1.0f - (distToCamera / FLEE_RADIUS);
-            targetPanic = glm::clamp(targetPanic, 0.0f, 1.0f);
+        if (cameraPos.y < 64.0f) {
+            glm::vec3 toFish = fishWorldPos - cameraPos;
+            if (distToCamera > 0.001f) {
+                toFish /= distToCamera;
+            }
+            float dotProduct = glm::dot(cameraFront, toFish);
+            
+            // Ryby płoszą się na widok kamery (gdy są przed nią w odległości < 30m)
+            // lub gdy kamera jest bardzo blisko (< 10m) z dowolnej strony
+            const float sightDistance = 30.0f;
+            const float proximityDistance = 10.0f;
+            if ((dotProduct > 0.5f && distToCamera < sightDistance) || distToCamera < proximityDistance) {
+                float maxDist = (dotProduct > 0.5f) ? sightDistance : proximityDistance;
+                float basePanic = 1.0f - (distToCamera / maxDist);
+                targetPanic = glm::clamp(basePanic, 0.0f, 1.0f);
+            }
         }
         
         // Płynna interpolacja aktualnego poziomu paniki ryby
@@ -216,8 +233,8 @@ void FishManager::update(float deltaTime, const glm::vec3& cameraPos, bool feedi
         // Predkość zależy od paniki (max 6x szybciej)
         float currentFleeMult = 1.0f + (5.0f * fish.panicLevel);
 
-        // Advance along path
-        fish.t += fish.speed * currentFleeMult * deltaTime;
+        // Advance along path (globally slowed down to swim slower and more gracefully)
+        fish.t += fish.speed * 0.25f * currentFleeMult * deltaTime;
         if (fish.t >= 1.0f) fish.t -= 1.0f;
         if (fish.t < 0.0f)  fish.t += 1.0f;
     }
@@ -262,9 +279,24 @@ void FishManager::render(unsigned int shader, const glm::mat4& view, const glm::
         glm::vec3 interpNorm = glm::normalize(glm::mix(f1.normal, f2.normal, frac));
         glm::vec3 interpBinorm = glm::normalize(glm::mix(f1.binormal, f2.binormal, frac));
 
-        // Build model matrix from interpolated frame + scale
-        float scale = (fish.speciesIndex == 0) ? 0.9f : 0.6f;
+        // Build model matrix from interpolated frame + scale (increased size)
+        float scale = (fish.speciesIndex == 0) ? 3.0f : 2.0f;
         
+        glm::vec3 finalPos = interpPos;
+        if (fish.panicLevel > 0.01f) {
+            glm::vec3 prePanicWorldPos = interpPos 
+                + (-interpBinorm) * fish.localOffset.y 
+                + (-interpNorm) * fish.localOffset.z;
+            
+            glm::vec3 fleeDir = prePanicWorldPos - cameraPos;
+            fleeDir.y *= 0.2f;
+            if (glm::length(fleeDir) > 0.001f) {
+                fleeDir = glm::normalize(fleeDir);
+            }
+            glm::vec3 escapeDir = glm::normalize(fleeDir * 0.7f + fish.scatterDir * 0.3f);
+            finalPos += escapeDir * (fish.panicLevel * 25.0f); // Zwiększony odskok do 25m
+        }
+
         // OBJ model: nose along -X (swims forward), dorsal fin along -Y (fix upside-down)
         // W PTF normal to wektor w poziomie, a binormal to wektor w pionie (w dół).
         // Aby ryba pływała pionowo (grzbietem do góry), oś Y (góra ryby) musi mapować się na -binormal.
@@ -272,17 +304,11 @@ void FishManager::render(unsigned int shader, const glm::mat4& view, const glm::
             glm::vec4(-interpTan,    0.0f),  // X = -tangent (kierunek przodu)
             glm::vec4(-interpBinorm, 0.0f),  // Y = -binormal (kierunek góry)
             glm::vec4(-interpNorm,   0.0f),  // Z = -normal (prawy bok, dla zachowania prawoskrętności)
-            glm::vec4(interpPos,     1.0f)
+            glm::vec4(finalPos,      1.0f)
         );
         
         // Zastosuj lokalny offset (ryby trzymają się równolegle do głównej ścieżki ławicy)
         model = glm::translate(model, fish.localOffset);
-        
-        // Dodaj efekt rozpływania się ławicy przy panice
-        if (fish.panicLevel > 0.01f) {
-            // Płynne odskakiwanie ryby do max 6 metrów w jej scatterDir
-            model = glm::translate(model, fish.scatterDir * (fish.panicLevel * 6.0f));
-        }
 
         model = glm::scale(model, glm::vec3(scale));
 
@@ -326,20 +352,29 @@ void FishManager::renderShadow(unsigned int shadowShader, const glm::mat4& light
         glm::vec3 interpNorm = glm::normalize(glm::mix(f1.normal, f2.normal, frac));
         glm::vec3 interpBinorm = glm::normalize(glm::mix(f1.binormal, f2.binormal, frac));
 
-        float scale = (fish.speciesIndex == 0) ? 0.9f : 0.6f;
-        
+        float scale = (fish.speciesIndex == 0) ? 3.0f : 2.0f;
+        glm::vec3 finalPos = interpPos;
+        if (fish.panicLevel > 0.01f) {
+            glm::vec3 prePanicWorldPos = interpPos 
+                + (-interpBinorm) * fish.localOffset.y 
+                + (-interpNorm) * fish.localOffset.z;
+            
+            glm::vec3 fleeDir = prePanicWorldPos - cameraPos;
+            fleeDir.y *= 0.2f;
+            if (glm::length(fleeDir) > 0.001f) {
+                fleeDir = glm::normalize(fleeDir);
+            }
+            glm::vec3 escapeDir = glm::normalize(fleeDir * 0.7f + fish.scatterDir * 0.3f);
+            finalPos += escapeDir * (fish.panicLevel * 25.0f);
+        }
+
         glm::mat4 model = glm::mat4(
             glm::vec4(-interpTan,    0.0f),
             glm::vec4(-interpBinorm, 0.0f),
             glm::vec4(-interpNorm,   0.0f),
-            glm::vec4(interpPos,     1.0f)
+            glm::vec4(finalPos,      1.0f)
         );
         model = glm::translate(model, fish.localOffset);
-        
-        // Dodaj efekt rozpływania się ławicy przy panice dla cieni
-        if (fish.panicLevel > 0.01f) {
-            model = glm::translate(model, fish.scatterDir * (fish.panicLevel * 6.0f));
-        }
 
         model = glm::scale(model, glm::vec3(scale));
 

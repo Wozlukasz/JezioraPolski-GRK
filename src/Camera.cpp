@@ -217,6 +217,10 @@ void processInput(GLFWwindow* window) {
         newPos += currentSpeed * up;
     if (glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS)
         newPos -= currentSpeed * up;
+    if (glfwGetKey(window, GLFW_KEY_T) == GLFW_PRESS) {
+        newPos = glm::vec3(28.0f, 57.0f, 35.0f);
+        std::cout << "Teleportacja do lawicy ryb: (28, 57, 35)" << std::endl;
+    }
 
     // Sprawdź czy nowa pozycja jest na terenie
     float newTerrainHeight = getTerrainHeight(newPos.x, newPos.z);
