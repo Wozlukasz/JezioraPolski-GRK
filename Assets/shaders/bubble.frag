@@ -42,7 +42,7 @@ void main() {
     
     // Underwater fog
     float fogDist = length(viewPos - bubblePos);
-    vec3 fogColor = vec3(0.25, 0.45, 0.15);
+    vec3 fogColor = vec3(0.05, 0.20, 0.15);
     float fogFactor = 1.0 - exp(-fogDist * 0.12);
     color = mix(color, fogColor, fogFactor * 0.5);
     

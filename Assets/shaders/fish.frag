@@ -203,7 +203,7 @@ void main() {
     
     // ====== Underwater fog ======
     float dist = length(viewPos - FragPos);
-    vec3 fogColor = vec3(0.25, 0.45, 0.15);
+    vec3 fogColor = vec3(0.05, 0.20, 0.15);
     float fogFactor = 0.0;
     
     if (viewPos.y > 64.0) {

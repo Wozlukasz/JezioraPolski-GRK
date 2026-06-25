@@ -293,9 +293,9 @@ int main() {
 
         // 2. Normal render pass
         glViewport(0, 0, width, height);
-        // Dynamiczny kolor tła — pod wodą jasna zieleń, nad wodą niebo
+        // Dynamiczny kolor tła — pod wodą realistyczna, ciemna zieleń, nad wodą niebo
         if (cameraPos.y <= 64.0f) {
-            glClearColor(0.25f, 0.45f, 0.15f, 1.0f); // Jaśniejsza zieleń (zgodnie z mgłą)
+            glClearColor(0.05f, 0.20f, 0.15f, 1.0f); // Mroczniejsza, realistyczna zieleń polskiego jeziora
         } else {
             glClearColor(0.53f, 0.81f, 0.92f, 1.0f); // Jasne niebo
         }

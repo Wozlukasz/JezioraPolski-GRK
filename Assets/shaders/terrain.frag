@@ -226,13 +226,18 @@ void main() {
 
     // Mgła podwodna — miękka, eksponencjalna (realistyczna)
     float dist = length(viewPos - FragPos);
-    vec3 fogColor = vec3(0.25, 0.45, 0.15); // Jaśniejsza, bardziej żółta zieleń jak ze zdjęcia
+    vec3 fogColor = vec3(0.05, 0.20, 0.15); // Mroczniejsza, realistyczna zieleń
     float fogFactor = 0.0;
     
     if (viewPos.y > 64.0) {
         if (FragPos.y < 64.0) {
             float depth = 64.0 - FragPos.y;
             fogFactor = 1.0 - exp(-depth * 0.25);
+        } else {
+            // Mgła atmosferyczna (nad wodą) - horyzont wtapia się w niebo
+            fogColor = vec3(0.53, 0.81, 0.92); // Kolor jasnego nieba (z main.cpp)
+            float fogDensity = 0.003; // Zgodnie z gęstością z instanced_plant.frag
+            fogFactor = 1.0 - exp(-dist * fogDensity);
         }
     } else {
         // Eksponencjalna mgła dystansowa — gładkie zanikanie zamiast ostrego cięcia

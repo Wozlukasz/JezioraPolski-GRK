@@ -193,15 +193,20 @@ void main() {
         finalColor.b *= mix(1.0, 0.5, waterDepth);
     }
     
-    // Mgła podwodna — jasny, ciepły, żółtawy zielony (jak na zdjęciu)
+    // Mgła podwodna — mroczniejszy, realistyczny kolor polskiego jeziora
     float dist = length(viewPos - FragPos);
-    vec3 fogColor = vec3(0.25, 0.45, 0.15);
+    vec3 fogColor = vec3(0.05, 0.20, 0.15);
     float fogFactor = 0.0;
     
     if (viewPos.y > 64.0) {
         if (FragPos.y < 64.0) {
             float depth = 64.0 - FragPos.y;
             fogFactor = 1.0 - exp(-depth * 0.25);
+        } else {
+            // Mgła atmosferyczna (nad wodą) - drzewa i horyzont wtapiają się w niebo
+            fogColor = vec3(0.53, 0.81, 0.92); // Kolor jasnego nieba (z main.cpp)
+            float fogDensity = 0.003; // Delikatna gęstość, odpowiednia dla dużych dystansów
+            fogFactor = 1.0 - exp(-dist * fogDensity);
         }
     } else {
         // Eksponencjalna mgła — gładkie, naturalne zanikanie
