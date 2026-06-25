@@ -140,8 +140,9 @@ void mouse_callback(GLFWwindow* window, double xposIn, double yposIn) {
     xoffset *= sensitivity;
     yoffset *= sensitivity;
 
-    // Obrót Pitch (Góra/Dół) względem LOKALNEJ osi Right (X)
-    glm::quat qPitch = glm::angleAxis(yoffset, cameraRight);
+    // Obrót Pitch (Góra/Dół) względem LOKALNEJ osi X
+    // Mnożenie z prawej strony oznacza obrót w układzie lokalnym!
+    glm::quat qPitch = glm::angleAxis(yoffset, glm::vec3(1.0f, 0.0f, 0.0f));
     
     // Sprawdzamy limit wychylenia w pionie (ok. 89 stopni), aby nurek nie zrobił salta
     glm::quat tempOrientation = cameraOrientation * qPitch;
@@ -150,7 +151,8 @@ void mouse_callback(GLFWwindow* window, double xposIn, double yposIn) {
         cameraOrientation = tempOrientation;
     }
 
-    // Obrót Yaw (Lewo/Prawo) względem GLOBALNEJ osi Up (Y), zapobiega przechyleniom bocznym (roll)
+    // Obrót Yaw (Lewo/Prawo) względem GLOBALNEJ osi Y (0,1,0)
+    // Mnożenie z lewej strony oznacza obrót w układzie globalnym! Zapobiega to przechyłom bocznym (roll).
     glm::quat qYaw = glm::angleAxis(-xoffset, glm::vec3(0.0f, 1.0f, 0.0f));
     cameraOrientation = qYaw * cameraOrientation;
     
