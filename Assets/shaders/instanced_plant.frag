@@ -55,11 +55,11 @@ uniform bool isTree;
 
 void main() {
     vec4 texColor = texture(texture_diffuse1, TexCoords);
-    // Bardzo wysoki próg odrzucenia przezroczystości (Alpha Testing)
-    // Modele 2D (billboardy) bez pełnego Blendingu potrzebują ostrego odcięcia (0.8),
-    // w przeciwnym razie wygładzone (anti-aliased) krawędzie z półprzezroczystym 
-    // kolorem tła rysują się jako w pełni nieprzezroczyste i udają 'prześwitujące niebo' lub obramówkę.
-    if(texColor.a < 0.8) discard;
+    
+    // Mipmapy powodują rozmycie kanału alpha, przez co cienkie modele tataraku znikają!
+    // Obniżamy próg dla płaskich modeli (lodFadeMode 2 i 3)
+    float alphaThreshold = (lodFadeMode == 2 || lodFadeMode == 3) ? 0.3 : 0.8;
+    if(texColor.a < alphaThreshold) discard;
     
     // ======== LOD Crossfade (Screen-door dithering) ========
     if (lodFadeMode > 0) {
