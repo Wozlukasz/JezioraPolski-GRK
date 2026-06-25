@@ -20,9 +20,9 @@ void main() {
         FragColor = vec4(cubemapColor, 1.0);
     } else if (underwater) {
         // === Pod wodą: proceduralny fallback (Generowanie Cubemapy) ===
-        vec3 colorTop = vec3(0.75, 0.88, 0.55); // Jasne żółto-zielone światło z powierzchni
-        vec3 colorMid = vec3(0.45, 0.58, 0.30); // Horyzont - MUST MATCH FOG COLOR!
-        vec3 colorBottom = vec3(0.20, 0.35, 0.15); // Głębia - wciąż dość jasna zieleń
+        vec3 colorTop = vec3(0.50, 0.72, 0.88);    // Jasne niebiesko-białe światło z powierzchni
+        vec3 colorMid = vec3(0.06, 0.18, 0.25);    // Horyzont — MUST MATCH FOG COLOR!
+        vec3 colorBottom = vec3(0.02, 0.06, 0.10); // Głębia — ciemny granat
 
         float t = clamp(dir.y * 0.5 + 0.5, 0.0, 1.0);
         vec3 finalColor;

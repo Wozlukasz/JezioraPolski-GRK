@@ -308,41 +308,41 @@ void PlantManager::loadSpecies(const std::string& name, const std::string& maskP
 void PlantManager::init() {
     loadSpecies("Moczarka Delikatna", 
                 "Assets/distribution-masks/maska-moczarki-delikatne.png",
-                "Assets/tufts/moczarka-delikatna-kępka.json",
-                "Assets/flat-models/renders/moczarka-delikatna/moczarka-delikatna-flat0.png",
-                {"Assets/flat-models/objects/moczarka-delikatna-flat.obj"}, 2.5f,
+                "Assets/tufts/moczarka-delikatna-kepka.json",
+                "Assets/materials/moczarka-delikatna/moczarka-delikatna-diffuse.png",
+                {"Assets/models/moczarka-delikatna/moczarka-delikatna-1.obj", "Assets/models/moczarka-delikatna/moczarka-delikatna-2.obj"}, 2.5f,
                 {"Assets/flat-models/objects/moczarka-delikatna-flat.obj"},
                 {"Assets/flat-models/renders/moczarka-delikatna/moczarka-delikatna-flat0.png"}, true);
 
     loadSpecies("Mech Zdrojek", 
                 "Assets/distribution-masks/maska-mech-zdrojek.png",
-                "Assets/tufts/mech-zdrojek-kępka.json",
-                "Assets/flat-models/renders/mech-zdrojek/mech-zdrojek-flat0.png",
-                {"Assets/flat-models/objects/mech-zdrojek-flat.obj"}, 2.5f,
+                "Assets/tufts/mech-zdrojek-kepka.json",
+                "Assets/materials/mech-zdrojek/mech-zdrojek-diffuse.png",
+                {"Assets/models/mech-zdrojek/mech-zdrojek-1.obj", "Assets/models/mech-zdrojek/mech-zdrojek-2.obj", "Assets/models/mech-zdrojek/mech-zdrojek-3.obj"}, 2.5f,
                 {"Assets/flat-models/objects/mech-zdrojek-flat.obj"},
                 {"Assets/flat-models/renders/mech-zdrojek/mech-zdrojek-flat0.png"}, true);
 
     loadSpecies("Moczarka Kanadyjska", 
                 "Assets/distribution-masks/maska-moczarki-kanadyjskie.png",
-                "Assets/tufts/moczarka-kanadyjska-kępka.json",
-                "Assets/flat-models/renders/moczarka-kanadyjska/moczarka-kanadyjska-flat0.png",
-                {"Assets/flat-models/objects/moczarka-kanadyjska-flat.obj"}, 2.5f,
+                "Assets/tufts/moczarka-kanadyjska-kepka.json",
+                "Assets/materials/moczarka-kanadyjska/moczarka-kanadyjska-diffuse.png",
+                {"Assets/models/moczarka-kanadyjska/moczarka-kanadyjska-1.obj", "Assets/models/moczarka-kanadyjska/moczarka-kanadyjska-2.obj", "Assets/models/moczarka-kanadyjska/moczarka-kanadyjska-3.obj"}, 2.5f,
                 {"Assets/flat-models/objects/moczarka-kanadyjska-flat.obj"},
                 {"Assets/flat-models/renders/moczarka-kanadyjska/moczarka-kanadyjska-flat0.png"}, true);
 
     loadSpecies("Rogatek Sztywny", 
                 "Assets/distribution-masks/maska-rogatek-sztywny.png",
-                "Assets/tufts/rogatek-sztywny-kępka.json",
-                "Assets/flat-models/renders/rogatek-sztywny/rogatek-sztywny-flat0.png",
-                {"Assets/flat-models/objects/rogatek-sztywny-flat.obj"}, 2.5f,
+                "Assets/tufts/rogatek-sztywny-kepka.json",
+                "Assets/materials/rogatek-sztywny/rogatek-sztywny-diffuse.png",
+                {"Assets/models/rogatek-sztywny/rogatek-sztywny-1.obj", "Assets/models/rogatek-sztywny/rogatek-sztywny-2.obj"}, 2.5f,
                 {"Assets/flat-models/objects/rogatek-sztywny-flat.obj"},
                 {"Assets/flat-models/renders/rogatek-sztywny/rogatek-sztywny-flat0.png"}, true);
 
     loadSpecies("Rogatek Krotkoszyjkowy", 
                 "Assets/distribution-masks/maska-rogatek-krotkoszyjkowy.png",
                 "Assets/tufts/rogatek-krotkoszyjkowy-kepka.json",
-                "Assets/flat-models/renders/rogatek-krotkoszyjkowy/rogatek-krotkoszyjkowy-flat0.png",
-                {"Assets/flat-models/objects/rogatek-krotkoszyjkowy-flat.obj"}, 2.5f,
+                "Assets/materials/rogatek-krotkoszyjkowy/rogatek-krotkoszyjkowy-diffuse.png",
+                {"Assets/models/rogatek-krotkoszyjkowy/rogatek-krotkoszyjkowy-1.obj", "Assets/models/rogatek-krotkoszyjkowy/rogatek-krotkoszyjkowy-2.obj"}, 2.5f,
                 {"Assets/flat-models/objects/rogatek-krotkoszyjkowy-flat.obj"},
                 {"Assets/flat-models/renders/rogatek-krotkoszyjkowy/rogatek-krotkoszyjkowy-flat0.png"}, true);
 
@@ -375,18 +375,16 @@ void PlantManager::init() {
                 {"Assets/models/drzewo/drzewo.obj"}, 22.0f, {}, {}, true); // flipMainTex = true!
 }
 
-void PlantManager::render(unsigned int shader, const glm::vec3& camPos, const glm::mat4& vpMatrix) {
+void PlantManager::render(unsigned int shader, const glm::vec3& camPos, const glm::mat4& vpMatrix, bool isReflection) {
     glUseProgram(shader);
     glm::vec2 camPos2D(camPos.x, camPos.z);
     auto frustumPlanes = extractFrustumPlanes(vpMatrix);
     
     // Próg LOD: poniżej tego dystansu → szczegółowe, powyżej → flat.
-    // Chunk jest 10x10m, więc decyzja jest per-chunk: albo detail, albo flat.
-    // Zmniejszamy próg, aby bardzo drastycznie poprawić FPS (2 FPS to tragedia)
-    const float LOD_THRESHOLD = 12.0f; 
-    const float FADE_BAND = 5.0f; // Szerokość strefy płynnego przenikania
-    const float RENDER_DIST = (camPos.y > 64.0f) ? 45.0f : 35.0f;
-    const float CHUNK_RADIUS = 7.07f;
+    float LOD_THRESHOLD = isReflection ? 25.0f : 40.0f;  // Dystans przejścia detail→flat 
+    float FADE_BAND = 10.0f;      // Strefa crossfade między modelami
+    float RENDER_DIST = isReflection ? 300.0f : 800.0f;
+    const float CHUNK_RADIUS = 10.0f;   // Bardziej konserwatywny promień chunka
     
     GLint loc_lodFadeMode = glGetUniformLocation(shader, "lodFadeMode");
     GLint loc_lodThreshold = glGetUniformLocation(shader, "lodThreshold");
@@ -416,16 +414,23 @@ void PlantManager::render(unsigned int shader, const glm::vec3& camPos, const gl
 
                 bool inFrustum = sphereInFrustum(frustumPlanes, chunk.center, currentChunkRadius);
                 
-                // Detail mode: lodFadeMode = 1
+                // Detail mode:
+                // - Bez flat LOD: renderuj zawsze w zasięgu RENDER_DIST
+                // - Z flat LOD: renderuj gdy dist < LOD_THRESHOLD+FADE_BAND (krzyżuje się z flat)
                 float currentRenderDist = RENDER_DIST;
-                // Drzewa nie mają flat LOD, i muszą być widoczne zawsze (nie znikają bez względu na dystans)
                 if (species.name == "Drzewo (Sosna)") currentRenderDist = 999999.0f;
                 
-                bool useDetail = var.hasFlatLOD ? (dist < LOD_THRESHOLD) : (dist < currentRenderDist + currentChunkRadius);
+                bool useDetail;
+                if (!var.hasFlatLOD) {
+                    useDetail = (dist < currentRenderDist + currentChunkRadius);
+                } else {
+                    // Renderuj szczegóły aż do LOD_THRESHOLD+FADE_BAND żeby nie było dziury
+                    useDetail = (dist < LOD_THRESHOLD + FADE_BAND + currentChunkRadius);
+                }
                 
                 if (useDetail && inFrustum) {
-                    // Jeśli mamy model flat, robimy twarde cięcie bez kropek. Jeśli nie, renderujemy normalnie (0).
-                    glUniform1i(loc_lodFadeMode, 0); 
+                    // lodFadeMode=1: fade out szczegółów w strefie FADE_BAND po progu LOD_THRESHOLD
+                    glUniform1i(loc_lodFadeMode, var.hasFlatLOD ? 1 : 0);
                     glBindVertexArray(chunk.vao);
                     glDrawArraysInstanced(GL_TRIANGLES, 0, var.vertexCount, chunk.instanceCount);
                 }
@@ -444,16 +449,16 @@ void PlantManager::render(unsigned int shader, const glm::vec3& camPos, const gl
                 float dist = glm::distance(chunkPos2D, camPos2D);
                 
                 bool inFrustum = sphereInFrustum(frustumPlanes, chunk.center, CHUNK_RADIUS);
-                // Flat LOD: render od progu LOD do końca widoczności
-                // Ponieważ zrezygnowaliśmy z ditheringu (kropek), robimy twardy przeskok na tańsze oświetlenie
+                // Flat LOD: render od progu LOD (z nakładką FADE_BAND) do końca widoczności
                 float currentFlatRenderDist = RENDER_DIST;
                 if (species.name == "Tatarak" || species.name == "Drzewo (Sosna)") currentFlatRenderDist = 999999.0f;
                 
-                bool useFlat = (dist >= LOD_THRESHOLD) && (dist < currentFlatRenderDist + CHUNK_RADIUS);
+                // Zaczyna się FADE_BAND przed progiem LOD (overlap z detail)
+                bool useFlat = (dist >= LOD_THRESHOLD - FADE_BAND) && (dist < currentFlatRenderDist + CHUNK_RADIUS);
                 
                 if (useFlat && inFrustum) {
-                    // lodFadeMode = 3 dla flat modeli (zmienione dla naprawy przezroczystości)
-                    glUniform1i(loc_lodFadeMode, 3); 
+                    // lodFadeMode=2: fade in flat w strefie FADE_BAND przed progiem LOD_THRESHOLD
+                    glUniform1i(loc_lodFadeMode, 2); 
                     glBindVertexArray(chunk.flatVAO);
                     glDrawArraysInstanced(GL_TRIANGLES, 0, var.flatVertexCount, chunk.instanceCount);
                 }

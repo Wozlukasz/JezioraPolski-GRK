@@ -63,21 +63,25 @@ void main() {
     vec4 texColor = texture(texture_diffuse1, TexCoords);
     
     // Mipmapy powodują rozmycie kanału alpha, przez co cienkie modele tataraku znikają!
-    // Obniżamy próg dla płaskich modeli (lodFadeMode 2 i 3)
-    float alphaThreshold = (lodFadeMode == 2 || lodFadeMode == 3) ? 0.3 : 0.8;
+    // Obniżamy próg dla płaskich modeli i modeli fade-out
+    float alphaThreshold;
+    if (lodFadeMode == 2 || lodFadeMode == 3) alphaThreshold = 0.25;
+    else if (lodFadeMode == 1) alphaThreshold = 0.5;
+    else alphaThreshold = 0.8;
     if(texColor.a < alphaThreshold) discard;
     
     // ======== LOD Crossfade (Screen-door dithering) ========
-    if (lodFadeMode > 0) {
+    if (lodFadeMode == 1 || lodFadeMode == 2) {
         float dist = length(viewPos - FragPos);
         float alpha = 1.0;
         
         if (lodFadeMode == 1) {
-            // Model detaliczny znika w miarę oddalania się w strefie FADE_BAND
+            // Model detaliczny znika: od 1.0 przy lodThreshold do 0.0 przy lodThreshold+lodFadeBand
             alpha = 1.0 - clamp((dist - lodThreshold) / lodFadeBand, 0.0, 1.0);
         } else if (lodFadeMode == 2) {
-            // Model płaski pojawia się w miarę oddalania się w strefie FADE_BAND
-            alpha = clamp((dist - lodThreshold) / lodFadeBand, 0.0, 1.0);
+            // Model płaski pojawia się: od 0.0 przy (lodThreshold-lodFadeBand) do 1.0 przy lodThreshold
+            // Strefa nakładki zaczyna się FADE_BAND przed progiem LOD
+            alpha = clamp((dist - (lodThreshold - lodFadeBand)) / lodFadeBand, 0.0, 1.0);
         }
         
         if (alpha < 1.0) {
@@ -115,7 +119,7 @@ void main() {
         float NdotL = NdotL_front + NdotL_back * 0.4;
         
         vec3 lightColor = vec3(1.0, 0.95, 0.85) * 2.5;
-        vec3 ambient = vec3(0.35, 0.40, 0.30) * albedo;
+        vec3 ambient = vec3(0.50, 0.55, 0.45) * albedo;
         vec3 diffuse = albedo / PI * lightColor * NdotL;
         
         finalColor = ambient + diffuse;
@@ -148,8 +152,8 @@ void main() {
         vec3 Lo = (kD * albedo / PI + specular) * lightColor * NdotL;
         
         float shadow = 0.0;
-        // Jasny ambient
-        vec3 ambient = vec3(0.35, 0.40, 0.30) * albedo;
+        // Wysoki ambient — rośliny są oświetlone rozproszonym światłem ze wszystkich kierunków
+        vec3 ambient = vec3(0.50, 0.55, 0.45) * albedo;
         
         finalColor = ambient + (1.0 - shadow) * Lo + sss * sssColor;
     }
@@ -188,39 +192,33 @@ void main() {
         float directional = mix(0.3, 1.0, pow(viewLightDot, 2.0));
         
         float rayStrength = rayPattern * rayFade * directional * 0.18;
-        finalColor += vec3(0.12, 0.22, 0.06) * rayStrength;
+        finalColor += vec3(0.20, 0.25, 0.22) * rayStrength;
     }
     
-    // Korekta barw pod wodą
+    // Korekta barw pod wodą — woda absorbuje czerwień, zachowuje niebieski
     if (FragPos.y < 64.0) {
-        float waterDepth = clamp((64.0 - FragPos.y) / 15.0, 0.0, 1.0);
-        finalColor.r *= mix(1.0, 0.6, waterDepth);
-        finalColor.g *= mix(1.0, 1.1, waterDepth);
-        finalColor.b *= mix(1.0, 0.5, waterDepth);
+        float waterDepth = clamp((64.0 - FragPos.y) / 20.0, 0.0, 1.0);
+        finalColor.r *= mix(1.0, 0.55, waterDepth);
+        finalColor.g *= mix(1.0, 0.90, waterDepth);
+        finalColor.b *= mix(1.0, 0.95, waterDepth);
     }
     
     // ======== MGŁA PODWODNA ========
     float dist = length(viewPos - FragPos);
-    vec3 fogColor = vec3(0.05, 0.20, 0.15); // Ciemny, bagienny kolor
+    vec3 fogColor = vec3(0.06, 0.18, 0.25);
     float fogFactor = 0.0;
     
-    // Jeśli obiekt jest nad wodą, NIE nakładaj na niego gęstej mgły podwodnej, 
-    // nawet jeśli kamera jest pod wodą. Zamiast tego nałóż mgłę atmosferyczną.
     if (FragPos.y > 64.0 || isReflectionPass) {
-        // Mgła atmosferyczna (nad wodą) - drzewa wtapiają się w niebo
-        fogColor = vec3(0.53, 0.81, 0.92); // Kolor jasnego nieba
+        fogColor = vec3(0.53, 0.81, 0.92);
         float fogDensity = 0.003; 
         fogFactor = 1.0 - exp(-dist * fogDensity);
     } else {
-        // Obiekt jest pod wodą!
         if (viewPos.y > 64.0) {
-            // Patrzymy z góry na obiekt pod wodą -> lekka mgła od głębokości
             float depth = 64.0 - FragPos.y;
-            fogFactor = 1.0 - exp(-depth * 0.25);
+            fogFactor = 1.0 - exp(-depth * 0.12);
         } else {
-            // Zarówno kamera jak i obiekt są pod wodą -> gęsta mgła!
-            float baseDensity = 0.06;
-            float depthDensity = max(0.0, 64.0 - viewPos.y) * 0.01;
+            float baseDensity = 0.025;
+            float depthDensity = max(0.0, 64.0 - viewPos.y) * 0.003;
             float fogDensity = baseDensity + depthDensity;
             fogFactor = 1.0 - exp(-dist * fogDensity);
         }

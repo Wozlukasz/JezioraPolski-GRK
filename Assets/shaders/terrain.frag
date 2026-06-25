@@ -79,17 +79,18 @@ float ShadowCalculation(vec4 fragPosLightSpace, vec3 normal, vec3 lightVec) {
     if(projCoords.z > 1.0) return 0.0;
 
     float currentDepth = projCoords.z;
-    float bias = max(0.005 * (1.0 - dot(normal, lightVec)), 0.001);
+    float bias = max(0.004 * (1.0 - dot(normal, lightVec)), 0.0005);
     
     float shadow = 0.0;
     vec2 texelSize = 1.0 / textureSize(shadowMap, 0);
-    for(int x = -1; x <= 1; ++x) {
-        for(int y = -1; y <= 1; ++y) {
+    // 5x5 PCF — 25 próbek, miękkie krawędzie cienia
+    for(int x = -2; x <= 2; ++x) {
+        for(int y = -2; y <= 2; ++y) {
             float pcfDepth = texture(shadowMap, projCoords.xy + vec2(x, y) * texelSize).r; 
             shadow += currentDepth - bias > pcfDepth  ? 1.0 : 0.0;        
         }    
     }
-    shadow /= 9.0;
+    shadow /= 25.0;
     return shadow;
 }
 
@@ -172,7 +173,7 @@ void main() {
     
     vec3 Lo = (kD * albedo / PI + specular) * lightColor * NdotL;
     
-    vec3 ambient = vec3(0.20, 0.25, 0.18) * albedo;
+    vec3 ambient = vec3(0.18, 0.22, 0.25) * albedo;
     
     vec3 finalColor = ambient + (1.0 - shadow) * Lo;
 
@@ -204,7 +205,7 @@ void main() {
     }
 
     // === Kaustyki podwodne ===
-    if (FragPos.y < 63.5 && FragPos.y > 50.0) {
+    if (FragPos.y < 63.5 && FragPos.y > 48.0) {
         float causticsIntensity = caustics(FragPos, time);
         float depthFade = clamp((63.5 - FragPos.y) / 12.0, 0.0, 1.0);
         float causticsStrength = causticsIntensity * (1.0 - depthFade) * 0.35;
@@ -227,38 +228,32 @@ void main() {
         float directional = mix(0.3, 1.0, pow(viewLightDot, 2.0));
         
         float rayStrength = rayPattern * rayFade * directional * 0.20;
-        finalColor += vec3(0.15, 0.25, 0.08) * rayStrength;
+        finalColor += vec3(0.20, 0.25, 0.22) * rayStrength;
     }
 
     // ======== MGŁA PODWODNA ========
     float dist = length(viewPos - FragPos);
-    vec3 fogColor = vec3(0.05, 0.20, 0.15); // Mroczniejsza, realistyczna zieleń
+    vec3 fogColor = vec3(0.06, 0.18, 0.25); // Niebiesko-turkusowy kolor jeziora
     float fogFactor = 0.0;
     
-    // Jeśli obiekt (teren) jest nad wodą, NIE nakładaj na niego gęstej mgły podwodnej, 
-    // nawet jeśli kamera jest pod wodą. Zamiast tego nałóż mgłę atmosferyczną.
     if (FragPos.y > 64.0 || isReflectionPass) {
-        // Mgła atmosferyczna (nad wodą) - horyzont wtapia się w niebo
-        fogColor = vec3(0.53, 0.81, 0.92); // Kolor jasnego nieba
+        fogColor = vec3(0.53, 0.81, 0.92);
         float fogDensity = 0.003; 
         fogFactor = 1.0 - exp(-dist * fogDensity);
     } else {
-        // Obiekt jest pod wodą!
         if (viewPos.y > 64.0) {
-            // Patrzymy z góry na obiekt pod wodą -> lekka mgła od głębokości
             float depth = 64.0 - FragPos.y;
-            fogFactor = 1.0 - exp(-depth * 0.25);
+            fogFactor = 1.0 - exp(-depth * 0.12);
         } else {
-            // Zarówno kamera jak i obiekt są pod wodą -> gęsta mgła!
-            float baseDensity = 0.06;
-            float depthDensity = max(0.0, 64.0 - viewPos.y) * 0.01;
+            float baseDensity = 0.025;
+            float depthDensity = max(0.0, 64.0 - viewPos.y) * 0.003;
             float fogDensity = baseDensity + depthDensity;
             fogFactor = 1.0 - exp(-dist * fogDensity);
         }
         
-        // Absorpcja barw pod wodą: ciepły zielony ton (tylko pod wodą)
-        float waterDepth = clamp((64.0 - FragPos.y) / 15.0, 0.0, 1.0);
-        fogColor = mix(vec3(0.08, 0.25, 0.20), vec3(0.02, 0.10, 0.08), waterDepth);
+        // Absorpcja barw pod wodą — woda absorbuje czerwień, zachowuje niebieski
+        float waterDepth = clamp((64.0 - FragPos.y) / 20.0, 0.0, 1.0);
+        fogColor = mix(vec3(0.08, 0.20, 0.28), vec3(0.03, 0.10, 0.18), waterDepth);
     }
 
     finalColor = mix(finalColor, fogColor, fogFactor);

@@ -31,7 +31,7 @@ struct PlantSpecies {
 class PlantManager {
 public:
     void init();
-    void render(unsigned int shader, const glm::vec3& cameraPos, const glm::mat4& vpMatrix);
+    void render(unsigned int shader, const glm::vec3& cameraPos, const glm::mat4& vpMatrix, bool isReflection = false);
     void renderShadow(unsigned int shadowShader, const glm::vec3& cameraPos, const glm::mat4& vpMatrix);
 
 private:

@@ -161,7 +161,7 @@ int main() {
   bubbleSystem.init();
 
   // Shadow Map FBO
-  const unsigned int SHADOW_WIDTH = 2048, SHADOW_HEIGHT = 2048;
+  const unsigned int SHADOW_WIDTH = 4096, SHADOW_HEIGHT = 4096;
   unsigned int depthMapFBO;
   glGenFramebuffers(1, &depthMapFBO);
   unsigned int depthMap;
@@ -169,8 +169,9 @@ int main() {
   glBindTexture(GL_TEXTURE_2D, depthMap);
   glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, SHADOW_WIDTH,
                SHADOW_HEIGHT, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+  // GL_LINEAR daje darmowy hardware PCF (bilinear filtering głębokości)
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
   float borderColor[] = {1.0, 1.0, 1.0, 1.0};
@@ -456,7 +457,7 @@ int main() {
         
         glActiveTexture(GL_TEXTURE1); glBindTexture(GL_TEXTURE_2D, depthMap);
         glDisable(GL_CULL_FACE);
-        plantManager.render(plantShader, refCamPos, projection * refView);
+        plantManager.render(plantShader, refCamPos, projection * refView, true);
         glEnable(GL_CULL_FACE);
     }
 
@@ -485,11 +486,9 @@ int main() {
     glBindVertexArray(terrainVAO);
     glDrawArrays(GL_TRIANGLES, 0, globalTerrainVertices.size());
 
-    // Cienie roślin
-    glUseProgram(shadowPlantShader);
-    glUniformMatrix4fv(loc_shadowPlant_lightSpaceMatrix, 1, GL_FALSE,
-                       glm::value_ptr(lightSpaceMatrix));
-    plantManager.renderShadow(shadowPlantShader, cameraPos, vpMatrix);
+    // Rośliny nie rzucają cieni — przezroczyste siatki dają brzydkie krawędzie na mapie cieni,
+    // a pod wodą rozproszone światło i tak eliminuje twarde cienie roślin
+    // plantManager.renderShadow(shadowPlantShader, cameraPos, vpMatrix);
 
     // Cienie ryb
     fishManager.renderShadow(fishShadowShader, lightSpaceMatrix);
@@ -502,7 +501,7 @@ int main() {
     glViewport(0, 0, width, height);
     // Dynamiczny kolor tła — pod wodą jasna zieleń, nad wodą niebo
     if (cameraPos.y <= 64.0f) {
-      glClearColor(0.05f, 0.20f, 0.15f, 1.0f); // Mroczniejsza, realistyczna zieleń polskiego jeziora
+      glClearColor(0.06f, 0.18f, 0.25f, 1.0f); // Niebiesko-turkusowy kolor jeziora
     } else {
       glClearColor(0.53f, 0.81f, 0.92f, 1.0f); // Jasne niebo
     }
@@ -581,7 +580,8 @@ int main() {
       glDepthMask(GL_TRUE);
     }
 
-    // Woda
+    // Woda — wyłącz culling żeby widzieć taflę od dołu (pod wodą)
+    glDisable(GL_CULL_FACE);
     glUseProgram(waterShader);
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, waterTex);
@@ -597,6 +597,7 @@ int main() {
     glUniform1f(loc_water_time, currentFrame);
     glBindVertexArray(waterVAO);
     glDrawArrays(GL_TRIANGLES, 0, waterVertices.size());
+    glEnable(GL_CULL_FACE);
 
     // Skybox
     glDepthFunc(GL_LEQUAL);

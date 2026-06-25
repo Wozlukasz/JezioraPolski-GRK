@@ -49,6 +49,20 @@ vec3 sampleNoTile(sampler2D samp, vec2 uv) {
     return w00*c00 + w10*c10 + w01*c01 + w11*c11;
 }
 
+// Kaustyki animowane — siatka zniekształceń świetlnych na spodzie tafli
+float causticPattern(vec2 uv, float t) {
+    vec2 p = uv * 8.0;
+    float c = 0.0;
+    // Kilka warstw fal interferujących ze sobą
+    c += sin(p.x * 1.3 + t * 1.1 + sin(p.y * 0.9 + t * 0.7)) * 0.5 + 0.5;
+    c += sin(p.y * 1.1 - t * 0.8 + sin(p.x * 1.4 - t * 0.6)) * 0.5 + 0.5;
+    c += sin((p.x + p.y) * 0.8 + t * 1.3) * 0.5 + 0.5;
+    c /= 3.0;
+    // Zaostrzenie — kaustyki mają ostre jasne pasy
+    c = pow(c, 4.0);
+    return c;
+}
+
 void main() {
     vec2 uv = TexCoords * 100.0;
     
@@ -122,31 +136,61 @@ void main() {
     // Przezroczystość zależna od Fresnela i kąta patrzenia
     float alpha = mix(0.75, 0.95, fresnel);
 
-    // Pod wodą — woda jest nieprzezroczysta (patrzymy od spodu na taflę)
+    // ===================================================================
+    // POD WODĄ: widok od spodu tafli — okno Snella + kaustyki
+    // ===================================================================
     if (viewPos.y < 64.0) {
-        waterColor = vec3(0.04, 0.10, 0.07);
+        // Patrzymy od dołu — viewDir wskazuje ku górze, liczymy kąt do pionu (0,1,0)
+        float cosTheta = max(dot(viewDir, vec3(0.0, 1.0, 0.0)), 0.0);
+
+        // --- Okno Snella ---
+        // Kąt graniczny wody: sin(θc) = 1/1.33 → θc ≈ 48.75°
+        // Gdy cosTheta > cos(48.75°) ≈ 0.66 jesteśmy w oknie
+        float snellCosThreshold = 0.66; // cos(48.75 deg)
+        float snellWindow = smoothstep(snellCosThreshold - 0.1, snellCosThreshold + 0.15, cosTheta);
+
+        // Kolor nieba widoczny przez okno Snella — jasny, niebiesko-biały
+        vec3 skyColor = vec3(0.65, 0.82, 0.88);
+        // Słońce w oknie Snella
+        vec3 sunDir = normalize(lightDir);
+        float sunDot = max(dot(viewDir, sunDir), 0.0);
+        float sunDisc = pow(sunDot, 60.0) * 2.0;
+        skyColor += vec3(1.0, 0.95, 0.8) * sunDisc;
+
+        // --- Kaustyki animowane na spodzie tafli ---
+        vec2 causticUV = FragPos.xz * 0.05;
+        float caus = causticPattern(causticUV, time);
+        // Kaustyki widać tylko w oknie Snella (tam pada światło słoneczne)
+        vec3 causticColor = vec3(0.30, 0.55, 0.30) * caus * snellWindow;
+
+        // Ciemna otoczka poza oknem — efekt totalnego odbicia wewnętrznego
+        vec3 darkEdge = vec3(0.01, 0.03, 0.06);
+
+        // Złóż: okno + ciemna otoczka
+        waterColor = mix(darkEdge, skyColor, snellWindow);
+        waterColor += causticColor;
+
+        // Dodatkowe iskierki — falowanie zniekształca okno
+        float shimmer = sin(FragPos.x * 3.0 + time * 2.5) * sin(FragPos.z * 2.7 + time * 2.1) * 0.5 + 0.5;
+        shimmer = pow(shimmer, 8.0) * snellWindow;
+        waterColor += vec3(0.4, 0.7, 0.4) * shimmer * 0.3;
+
         specular = vec3(0.0);
-        alpha = 0.85;
-        
-        // Promień Snella: słońce widoczne jako jasna plama z dołu
-        vec3 refractedSun = refract(-lightVector, vec3(0.0, -1.0, 0.0), 1.0/1.33);
-        float underSunGlow = pow(max(dot(viewDir, -refractedSun), 0.0), 40.0);
-        waterColor += vec3(0.15, 0.20, 0.12) * underSunGlow;
+
+        // Przezroczystość: w oknie Snella tafla jest prawie przezroczysta (widać niebo),
+        // poza oknem — nieprzezroczysta (totalnie odbijające)
+        alpha = mix(0.92, 0.25, snellWindow);
+
+        // Lekka mgła tylko w dużej odległości — nie zasłaniaj bliskiej tafli
+        vec3 fogColor = vec3(0.06, 0.18, 0.25);
+        float dist = length(viewPos - FragPos);
+        float fogDensity = 0.015; // bardzo niska gęstość — nie zamazuj tafli z bliska
+        float fogFactor = 1.0 - exp(-dist * fogDensity);
+        waterColor = mix(waterColor, fogColor, fogFactor * 0.5);
+
+        FragColor = vec4(waterColor + specular, alpha);
+        return;
     }
 
     FragColor = vec4(waterColor + specular, alpha);
-    
-    // Mgła podwodna aplikowana na taflę wody, aby w oddali lub na głębokości ukrywała obiekty na zewnątrz (niebo/drzewa)
-    if (viewPos.y < 64.0) {
-        vec3 fogColor = vec3(0.05, 0.20, 0.15); // Zgodnie z main.cpp i innymi shaderami
-        float dist = length(viewPos - FragPos);
-        float baseDensity = 0.06;
-        float depthDensity = max(0.0, 64.0 - viewPos.y) * 0.01;
-        float fogDensity = baseDensity + depthDensity;
-        float fogFactor = 1.0 - exp(-dist * fogDensity);
-        
-        // Zmieszanie ostatecznego koloru z mgłą i wymuszenie pełnego krycia w oddali
-        FragColor.rgb = mix(FragColor.rgb, fogColor, fogFactor);
-        FragColor.a = mix(FragColor.a, 1.0, fogFactor);
-    }
 }
