@@ -5,11 +5,18 @@
 
 // Global Camera variables
 glm::vec3 cameraPos = glm::vec3(32.1f, 66.0f, 38.3f); // Spawnpoint na brzegu blisko środka mapy
-glm::quat cameraOrientation = glm::quat(glm::vec3(glm::radians(-15.0f), glm::radians(-45.0f), 0.0f));
 
-glm::vec3 cameraFront = cameraOrientation * glm::vec3(0.0f, 0.0f, -1.0f);
-glm::vec3 cameraUp    = cameraOrientation * glm::vec3(0.0f, 1.0f, 0.0f);
-glm::vec3 cameraRight = cameraOrientation * glm::vec3(1.0f, 0.0f, 0.0f);
+// Kąty Eulera (w stopniach) — jedyne źródło prawdy o orientacji kamery
+static float cameraYaw   = -45.0f;   // Obrót lewo/prawo
+static float cameraPitch = -15.0f;   // Obrót góra/dół
+
+// Wektory kierunkowe — przeliczane z kątów Eulera
+glm::vec3 cameraFront;
+glm::vec3 cameraUp;
+glm::vec3 cameraRight;
+
+// Kwaternion orientacji — odbudowywany z kątów Eulera (używany przez main.cpp do macierzy view)
+glm::quat cameraOrientation;
 
 bool firstMouse = true;
 float lastX = 400.0f;
@@ -21,13 +28,34 @@ float deltaTime = 0.0f;
 float lastFrame = 0.0f;
 bool captureMouse = true;
 
-void updateCameraVectors() {
-    // Oblicz wektory kierunkowe kamery bezpośrednio z aktualnego kwaternionu (brak Gimbal Lock)
-    cameraFront = glm::normalize(cameraOrientation * glm::vec3(0.0f, 0.0f, -1.0f));
-    cameraUp    = glm::normalize(cameraOrientation * glm::vec3(0.0f, 1.0f, 0.0f));
-    cameraRight = glm::normalize(cameraOrientation * glm::vec3(1.0f, 0.0f, 0.0f));
-}
+// Forward declaration
+void updateCameraVectors();
 
+// Inicjalizacja wektorów kamery przy starcie programu
+static struct CameraInitializer {
+    CameraInitializer() { updateCameraVectors(); }
+} _cameraInit;
+
+// Przelicza wektory kamery i kwaternion z kątów Eulera.
+// Kluczowe: kwaternion jest ZAWSZE odbudowywany od zera (yaw * pitch),
+// więc komponent roll nigdy się nie akumuluje.
+void updateCameraVectors() {
+    // Oblicz wektor front z kątów Eulera
+    glm::vec3 front;
+    front.x = cos(glm::radians(cameraYaw)) * cos(glm::radians(cameraPitch));
+    front.y = sin(glm::radians(cameraPitch));
+    front.z = sin(glm::radians(cameraYaw)) * cos(glm::radians(cameraPitch));
+    cameraFront = glm::normalize(front);
+
+    // Right i Up zawsze względem globalnego "góra" — gwarantuje poziomy horyzont
+    cameraRight = glm::normalize(glm::cross(cameraFront, glm::vec3(0.0f, 1.0f, 0.0f)));
+    cameraUp    = glm::normalize(glm::cross(cameraRight, cameraFront));
+
+    // Odbuduj kwaternion z kątów Eulera (yaw wokół Y, potem pitch wokół X, ZERO roll)
+    glm::quat qYaw   = glm::angleAxis(glm::radians(-cameraYaw), glm::vec3(0.0f, 1.0f, 0.0f));
+    glm::quat qPitch = glm::angleAxis(glm::radians(cameraPitch), glm::vec3(1.0f, 0.0f, 0.0f));
+    cameraOrientation = glm::normalize(qPitch * qYaw);
+}
 
 // Interaction flags
 bool flashlightOn = false;
@@ -132,30 +160,20 @@ void mouse_callback(GLFWwindow* window, double xposIn, double yposIn) {
     }
 
     float xoffset = xpos - lastX;
-    float yoffset = lastY - ypos; // reversed since y-coordinates go from bottom to top
+    float yoffset = lastY - ypos; // odwrócone bo Y ekranowy idzie w dół
     lastX = xpos;
     lastY = ypos;
 
-    float sensitivity = 0.002f; // Czułość dla radianów
+    float sensitivity = 0.1f;
     xoffset *= sensitivity;
     yoffset *= sensitivity;
 
-    // Obrót Pitch (Góra/Dół) względem LOKALNEJ osi Right (X)
-    glm::quat qPitch = glm::angleAxis(yoffset, cameraRight);
-    
-    // Sprawdzamy limit wychylenia w pionie (ok. 89 stopni), aby nurek nie zrobił salta
-    glm::quat tempOrientation = cameraOrientation * qPitch;
-    glm::vec3 testFront = glm::normalize(tempOrientation * glm::vec3(0.0f, 0.0f, -1.0f));
-    if (testFront.y < 0.99f && testFront.y > -0.99f) {
-        cameraOrientation = tempOrientation;
-    }
+    cameraYaw   += xoffset;
+    cameraPitch += yoffset;
 
-    // Obrót Yaw (Lewo/Prawo) względem GLOBALNEJ osi Up (Y), zapobiega przechyleniom bocznym (roll)
-    glm::quat qYaw = glm::angleAxis(-xoffset, glm::vec3(0.0f, 1.0f, 0.0f));
-    cameraOrientation = qYaw * cameraOrientation;
-    
-    // Normalizacja zapobiega gromadzeniu błędów zmiennoprzecinkowych
-    cameraOrientation = glm::normalize(cameraOrientation);
+    // Ograniczenie pitch — nie pozwala patrzeć dalej niż prosto w górę/dół
+    if (cameraPitch > 89.0f)  cameraPitch = 89.0f;
+    if (cameraPitch < -89.0f) cameraPitch = -89.0f;
 
     updateCameraVectors();
 }
@@ -196,10 +214,10 @@ void processInput(GLFWwindow* window) {
     
     // Boost prędkości przy użyciu klawisza CTRL
     float speedMultiplier = (glfwGetKey(window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS) ? 3.0f : 1.0f;
-    float currentSpeed = 6.0f * clampedDt * speedMultiplier; // Prędkość spaceru / pływania
+    float currentSpeed = 6.0f * clampedDt * speedMultiplier;
 
     glm::vec3 front = glm::normalize(cameraFront);
-    glm::vec3 right = glm::normalize(glm::cross(front, cameraUp));
+    glm::vec3 right = glm::normalize(glm::cross(front, glm::vec3(0.0f, 1.0f, 0.0f)));
     glm::vec3 up    = glm::vec3(0.0f, 1.0f, 0.0f);
 
     glm::vec3 newPos = cameraPos;
