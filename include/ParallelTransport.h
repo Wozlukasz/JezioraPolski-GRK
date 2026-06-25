@@ -94,6 +94,35 @@ inline std::vector<PTFrame> computePTFrames(const std::vector<glm::vec3>& points
         frames[i].binormal = glm::normalize(glm::cross(ti, frames[i].normal));
     }
 
+    // Korekcja skręcenia dla zamkniętej pętli (holonomia PTF)
+    if (points.size() > 2 && glm::distance(points.front(), points.back()) < 0.01f) {
+        glm::vec3 t0 = frames.front().tangent;
+        glm::vec3 n0 = frames.front().normal;
+        glm::vec3 nLast = frames.back().normal;
+
+        // Rzutowanie nLast na płaszczyznę prostopadłą do t0
+        nLast = glm::normalize(nLast - glm::dot(nLast, t0) * t0);
+
+        float cosTheta = glm::clamp(glm::dot(n0, nLast), -1.0f, 1.0f);
+        float angle = std::acos(cosTheta);
+
+        // Ustal znak kąta skręcenia
+        glm::vec3 crossN = glm::cross(nLast, n0);
+        if (glm::dot(crossN, t0) < 0.0f) {
+            angle = -angle;
+        }
+
+        // Liniowa dystrybucja korekcji wzdłuż całej ścieżki
+        for (size_t i = 0; i < frames.size(); ++i) {
+            float factor = (float)i / (float)(frames.size() - 1);
+            float theta = angle * factor;
+
+            glm::quat rot = glm::angleAxis(theta, frames[i].tangent);
+            frames[i].normal = glm::normalize(rot * frames[i].normal);
+            frames[i].binormal = glm::normalize(glm::cross(frames[i].tangent, frames[i].normal));
+        }
+    }
+
     return frames;
 }
 

@@ -209,12 +209,12 @@ void main() {
     if (viewPos.y > 64.0) {
         if (FragPos.y < 64.0) {
             float depth = 64.0 - FragPos.y;
-            fogFactor = 1.0 - exp(-depth * 0.25);
+            fogFactor = 1.0 - exp(-depth * 0.08); // Lżejsza mgła trans-powierzchniowa (0.08 zamiast 0.25)
         }
     } else {
-        // Eksponencjalna mgła — gęstnieje wraz z dystansem oraz głębokością nurka!
-        float baseDensity = 0.06;
-        float depthDensity = max(0.0, 64.0 - viewPos.y) * 0.01;
+        // Eksponencjalna mgła — lżejsza i bardziej przeźroczysta
+        float baseDensity = 0.015;
+        float depthDensity = max(0.0, 64.0 - viewPos.y) * 0.002;
         float fogDensity = baseDensity + depthDensity;
         fogFactor = 1.0 - exp(-dist * fogDensity);
     }

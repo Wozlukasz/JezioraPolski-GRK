@@ -30,10 +30,6 @@ uniform bool flashlightOn;
 uniform vec3 flashlightPos;
 uniform vec3 flashlightDir;
 
-uniform float clipY;
-uniform int clipMode;
-uniform bool isReflectionPass;
-
 const float PI = 3.14159265359;
 
 // ============ PBR Functions (Cook-Torrance BRDF) ============
@@ -104,8 +100,6 @@ float caustics(vec3 pos, float time) {
 }
 
 void main() {
-    if (clipMode == 1 && FragPos.y < clipY) discard;
-
     float y = FragPos.y;
     
     // Zwiększamy krotność UV z 150 do 300, aby tekstura gruntu wydawała się drobniejsza
@@ -230,37 +224,37 @@ void main() {
         finalColor += vec3(0.15, 0.25, 0.08) * rayStrength;
     }
 
-    // ======== MGŁA PODWODNA ========
+    // Mgła podwodna — miękka, eksponencjalna (realistyczna)
     float dist = length(viewPos - FragPos);
     vec3 fogColor = vec3(0.05, 0.20, 0.15); // Mroczniejsza, realistyczna zieleń
     float fogFactor = 0.0;
     
-    // Jeśli obiekt (teren) jest nad wodą, NIE nakładaj na niego gęstej mgły podwodnej, 
-    // nawet jeśli kamera jest pod wodą. Zamiast tego nałóż mgłę atmosferyczną.
-    if (FragPos.y > 64.0 || isReflectionPass) {
-        // Mgła atmosferyczna (nad wodą) - horyzont wtapia się w niebo
-        fogColor = vec3(0.53, 0.81, 0.92); // Kolor jasnego nieba
-        float fogDensity = 0.003; 
-        fogFactor = 1.0 - exp(-dist * fogDensity);
-    } else {
-        // Obiekt jest pod wodą!
-        if (viewPos.y > 64.0) {
-            // Patrzymy z góry na obiekt pod wodą -> lekka mgła od głębokości
+    if (viewPos.y > 64.0) {
+        if (FragPos.y < 64.0) {
             float depth = 64.0 - FragPos.y;
             fogFactor = 1.0 - exp(-depth * 0.25);
         } else {
-            // Zarówno kamera jak i obiekt są pod wodą -> gęsta mgła!
-            float baseDensity = 0.06;
-            float depthDensity = max(0.0, 64.0 - viewPos.y) * 0.01;
-            float fogDensity = baseDensity + depthDensity;
+            // Mgła atmosferyczna (nad wodą) - horyzont wtapia się w niebo
+            fogColor = vec3(0.53, 0.81, 0.92); // Kolor jasnego nieba (z main.cpp)
+            float fogDensity = 0.003; // Zgodnie z gęstością z instanced_plant.frag
             fogFactor = 1.0 - exp(-dist * fogDensity);
         }
+    } else {
+        // Eksponencjalna mgła dystansowa — gęstnieje wraz z dystansem oraz głębokością nurka!
+        float baseDensity = 0.06;
+        float depthDensity = max(0.0, 64.0 - viewPos.y) * 0.01;
+        float fogDensity = baseDensity + depthDensity;
+        fogFactor = 1.0 - exp(-dist * fogDensity);
         
-        // Absorpcja barw pod wodą: ciepły zielony ton (tylko pod wodą)
-        float waterDepth = clamp((64.0 - FragPos.y) / 15.0, 0.0, 1.0);
-        fogColor = mix(vec3(0.08, 0.25, 0.20), vec3(0.02, 0.10, 0.08), waterDepth);
+        // Absorpcja barw pod wodą: ciepły zielony ton
+        if (FragPos.y < 64.0) {
+            float waterDepth = clamp((64.0 - FragPos.y) / 15.0, 0.0, 1.0);
+            finalColor.r *= mix(1.0, 0.6, waterDepth);
+            finalColor.g *= mix(1.0, 1.1, waterDepth);
+            finalColor.b *= mix(1.0, 0.5, waterDepth);
+        }
     }
-
+    
     finalColor = mix(finalColor, fogColor, fogFactor);
 
     FragColor = vec4(finalColor, 1.0);
