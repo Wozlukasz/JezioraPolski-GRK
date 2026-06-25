@@ -123,4 +123,18 @@ void main() {
     }
 
     FragColor = vec4(waterColor + specular, alpha);
+    
+    // Mgła podwodna aplikowana na taflę wody, aby w oddali lub na głębokości ukrywała obiekty na zewnątrz (niebo/drzewa)
+    if (viewPos.y < 64.0) {
+        vec3 fogColor = vec3(0.05, 0.20, 0.15); // Zgodnie z main.cpp i innymi shaderami
+        float dist = length(viewPos - FragPos);
+        float baseDensity = 0.06;
+        float depthDensity = max(0.0, 64.0 - viewPos.y) * 0.01;
+        float fogDensity = baseDensity + depthDensity;
+        float fogFactor = 1.0 - exp(-dist * fogDensity);
+        
+        // Zmieszanie ostatecznego koloru z mgłą i wymuszenie pełnego krycia w oddali
+        FragColor.rgb = mix(FragColor.rgb, fogColor, fogFactor);
+        FragColor.a = mix(FragColor.a, 1.0, fogFactor);
+    }
 }

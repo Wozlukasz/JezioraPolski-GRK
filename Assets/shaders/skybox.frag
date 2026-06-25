@@ -17,10 +17,10 @@ void main() {
         vec3 cubemapColor = texture(skyboxCubemap, dir).rgb;
         FragColor = vec4(cubemapColor, 1.0);
     } else if (underwater) {
-        // === Pod wodą: proceduralny fallback ===
-        vec3 colorTop = vec3(0.25, 0.55, 0.30);
-        vec3 colorMid = vec3(0.15, 0.40, 0.18);
-        vec3 colorBottom = vec3(0.08, 0.20, 0.06);
+        // === Pod wodą: proceduralny fallback (Generowanie Cubemapy) ===
+        vec3 colorTop = vec3(0.06, 0.25, 0.18); // Zmierzchające światło z góry
+        vec3 colorMid = vec3(0.05, 0.20, 0.15); // Horyzont - MUST MATCH FOG COLOR!
+        vec3 colorBottom = vec3(0.02, 0.10, 0.08); // Głębia - bardzo ciemna
 
         float t = clamp(dir.y * 0.5 + 0.5, 0.0, 1.0);
         vec3 finalColor;

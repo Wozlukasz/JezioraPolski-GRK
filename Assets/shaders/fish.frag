@@ -212,7 +212,10 @@ void main() {
             fogFactor = 1.0 - exp(-depth * 0.25);
         }
     } else {
-        float fogDensity = 0.04; // Znacznie czystsza woda (było 0.25)
+        // Eksponencjalna mgła — gęstnieje wraz z dystansem oraz głębokością nurka!
+        float baseDensity = 0.06;
+        float depthDensity = max(0.0, 64.0 - viewPos.y) * 0.01;
+        float fogDensity = baseDensity + depthDensity;
         fogFactor = 1.0 - exp(-dist * fogDensity);
     }
     

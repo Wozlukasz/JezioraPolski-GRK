@@ -240,8 +240,10 @@ void main() {
             fogFactor = 1.0 - exp(-dist * fogDensity);
         }
     } else {
-        // Eksponencjalna mgła dystansowa — gładkie zanikanie zamiast ostrego cięcia
-        float fogDensity = 0.04; // Im wyższa wartość, tym gęstsza mgła
+        // Eksponencjalna mgła dystansowa — gęstnieje wraz z dystansem oraz głębokością nurka!
+        float baseDensity = 0.06;
+        float depthDensity = max(0.0, 64.0 - viewPos.y) * 0.01;
+        float fogDensity = baseDensity + depthDensity;
         fogFactor = 1.0 - exp(-dist * fogDensity);
         
         // Absorpcja barw pod wodą: ciepły zielony ton

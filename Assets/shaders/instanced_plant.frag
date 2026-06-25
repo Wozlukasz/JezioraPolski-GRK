@@ -209,8 +209,10 @@ void main() {
             fogFactor = 1.0 - exp(-dist * fogDensity);
         }
     } else {
-        // Eksponencjalna mgła — gładkie, naturalne zanikanie
-        float fogDensity = 0.04;
+        // Eksponencjalna mgła — gęstnieje wraz z dystansem oraz głębokością nurka!
+        float baseDensity = 0.06;
+        float depthDensity = max(0.0, 64.0 - viewPos.y) * 0.01;
+        float fogDensity = baseDensity + depthDensity;
         fogFactor = 1.0 - exp(-dist * fogDensity);
     }
     
