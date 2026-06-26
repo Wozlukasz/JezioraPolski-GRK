@@ -49,7 +49,12 @@ bool EncyclopediaOverlay::init(const std::string& fontPath) {
         "C:/Windows/Fonts/arial.ttf",
         "C:/Windows/Fonts/segoeui.ttf",
         "C:/Windows/Fonts/tahoma.ttf",
-        "C:/Windows/Fonts/verdana.ttf"
+        "C:/Windows/Fonts/verdana.ttf",
+        "/System/Library/Fonts/Supplemental/Arial.ttf",
+        "/Library/Fonts/Arial.ttf",
+        "/System/Library/Fonts/Helvetica.ttc",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+        "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf"
     }) {
         if (p && loadFont(p)) break;
     }
