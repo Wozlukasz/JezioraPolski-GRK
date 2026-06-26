@@ -140,47 +140,46 @@ void main() {
     // POD WODĄ: widok od spodu tafli — okno Snella + kaustyki
     // ===================================================================
     if (viewPos.y < 64.0) {
-        // Patrzymy od dołu — viewDir wskazuje ku górze, liczymy kąt do pionu (0,1,0)
-        float cosTheta = max(dot(viewDir, vec3(0.0, 1.0, 0.0)), 0.0);
+        // --- Okno Snella zależne od pofałdowanej fali (norm) ---
+        float cosTheta = max(dot(viewDir, norm), 0.0);
+        float snellCosThreshold = 0.66;
+        float snellWindow = smoothstep(snellCosThreshold - 0.05, snellCosThreshold + 0.05, cosTheta);
 
-        // --- Okno Snella ---
-        float snellCosThreshold = 0.66; // cos(48.75 deg)
-        float snellWindow = smoothstep(snellCosThreshold - 0.1, snellCosThreshold + 0.15, cosTheta);
-
-        // Tło jest liczone przez same obiekty (skybox, drzewa), więc nie rysujemy własnego nieba
-
-        // --- Kaustyki animowane na spodzie tafli ---
+        // Zupa zielona ze zdjęcia
+        vec3 deepWater = vec3(0.23, 0.35, 0.12);
+        vec3 shallowWater = vec3(0.55, 0.67, 0.25);
+        vec3 darkReflection = mix(deepWater, shallowWater, 0.2); // Odbicie toni poza oknem Snell'a
+        
         vec2 causticUV = FragPos.xz * 0.05;
         float caus = causticPattern(causticUV, time);
-        vec3 causticColor = vec3(0.30, 0.55, 0.30) * caus * snellWindow;
+        vec3 causticColor = vec3(0.8, 1.0, 0.6) * caus * 1.5;
 
-        // Ciemna otoczka poza oknem — kolor mgły
-        vec3 darkEdge = vec3(0.18, 0.35, 0.22);
+        // Błyski słoneczne na falkach
+        vec3 halfwayDir = normalize(lightVector + viewDir);
+        float spec = pow(max(dot(norm, halfwayDir), 0.0), 64.0);
+        vec3 sunSparkles = vec3(1.0, 1.0, 0.8) * spec * 3.0;
 
-        // Kolor nieba i obiektów będzie teraz po prostu prześwitywał z tła, my dodajemy tylko refleksy!
-        // Złóż: okno (czyste, przezroczyste) + ciemna otoczka
-        waterColor = mix(darkEdge, vec3(1.0), snellWindow);
-        waterColor += causticColor;
-
-        // Dodatkowe iskierki — falowanie zniekształca okno
-        float shimmer = sin(FragPos.x * 3.0 + time * 2.5) * sin(FragPos.z * 2.7 + time * 2.1) * 0.5 + 0.5;
-        shimmer = pow(shimmer, 8.0) * snellWindow;
-        waterColor += vec3(0.4, 0.7, 0.4) * shimmer * 0.3;
+        // Woda nie jest przezroczysta, dodajemy tylko światło kaustyk i słońca zmieszane z zieloną wodą
+        waterColor = mix(darkReflection, causticColor + sunSparkles, snellWindow);
 
         specular = vec3(0.0);
 
-        // Przezroczystość: w oknie Snella tafla jest mocno przezroczysta by pokazać niebo i obiekty nadwodne,
-        // które samodzielnie liczą swoją mgłę!
-        alpha = mix(0.95, 0.15, snellWindow);
+        // Alpha: w bardzo brudnej wodzie tafla rzadko cokolwiek przepuszcza
+        alpha = mix(0.98, 0.30, snellWindow);
 
-        // Mgła dopasowana do reszty podwodnego środowiska
-        vec3 fogColor = vec3(0.18, 0.35, 0.22);
+        // ---- ZUPA ZIELONA NA SAMEJ TAFLI ----
+        vec3 dir = normalize(FragPos - viewPos);
+        vec3 fogColor = mix(deepWater, shallowWater, clamp(dir.y * 0.5 + 0.5, 0.0, 1.0));
+        
         float dist = length(viewPos - FragPos);
-        float fogDensity = 0.03;
+        float fogDensity = 0.15; // Bardzo gęsta zupa
         float fogFactor = 1.0 - exp(-dist * fogDensity);
-        waterColor = mix(waterColor, fogColor, fogFactor * 0.5);
 
-        FragColor = vec4(waterColor + specular, alpha);
+        // Im dalej, tym woda staje się jedną gęstą mgłą
+        waterColor = mix(waterColor, fogColor, fogFactor);
+        alpha = mix(alpha, 1.0, fogFactor);
+
+        FragColor = vec4(waterColor, alpha);
         return;
     }
 
