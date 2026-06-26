@@ -8,6 +8,7 @@ struct PlantChunk {
     unsigned int flatVAO = 0; // VAO for flat model
     int instanceCount = 0;
     glm::vec3 center;
+    std::vector<glm::vec3> instancePositions;
 };
 
 struct PlantVariant {

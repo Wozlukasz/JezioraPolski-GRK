@@ -304,6 +304,11 @@ void PlantManager::loadSpecies(const std::string& name, const std::string& maskP
             if (cy < -900.0f) cy = -10.0f;
             chunk.center = glm::vec3(cx, cy, cz);
             
+            chunk.instancePositions.reserve(chunk.instanceCount);
+            for (const auto& m : pair.second) {
+                chunk.instancePositions.push_back(glm::vec3(m[3][0], m[3][1], m[3][2]));
+            }
+            
             // Detail VAO
             setupChunkVAO(species.variants[i].baseVBO, pair.second, chunk.vao, chunk.instVBO);
             
@@ -564,25 +569,34 @@ std::string PlantManager::getPlantAtCrosshair(const glm::vec3& camPos, const glm
         }
         if (skip) continue;
 
-        // Promień detekcji — dostosowany do chunku roślinnego (10m x 10m = ~7m promień + mały bufor)
-        const float HIT_RADIUS = 5.0f;
+        // Promienie cylindra i wysokość
+        const float RADIUS = 1.0f; 
+        const float HEIGHT = 2.5f; 
 
         for (const auto& var : species.variants) {
             for (const auto& chunk : var.chunks) {
-                // Ray-sphere intersection: promień = camPos + t * camFront, sfera = (chunk.center, HIT_RADIUS)
-                glm::vec3 oc = camPos - chunk.center;
-                float b = glm::dot(oc, camFront);
-                float c = glm::dot(oc, oc) - HIT_RADIUS * HIT_RADIUS;
-                float discriminant = b * b - c;
+                // Szybki test przeciwko calemu chunkowi (z promieniem ~15m)
+                glm::vec3 ocChunk = chunk.center - camPos;
+                float projChunk = glm::dot(ocChunk, camFront);
+                if (projChunk < -15.0f || projChunk > maxDist + 15.0f) continue;
+                float distToChunkLineSq = glm::dot(ocChunk, ocChunk) - projChunk * projChunk;
+                if (distToChunkLineSq > 225.0f) continue; // 15^2 = 225
 
-                if (discriminant < 0.0f) continue; // Brak przecięcia
+                // Test przeciwko poszczegolnym roslinom w chunku
+                for (const auto& pos : chunk.instancePositions) {
+                    glm::vec3 w = pos - camPos;
+                    float proj = glm::dot(w, camFront);
+                    if (proj < 0.0f || proj > bestT) continue; // Roślina za kamerą lub dalej niż obecna najlepsza
 
-                float t = -b - std::sqrt(discriminant);
-                if (t < 0.0f) t = -b + std::sqrt(discriminant); // Kamera wewnątrz sfery
-                if (t < 0.0f || t > bestT) continue;
-
-                bestT = t;
-                bestName = species.name;
+                    glm::vec3 closestPoint = camPos + camFront * proj;
+                    
+                    // Detekcja w formie cylindra (X/Z dystans od srodka, Y w odpowiednim przedziale)
+                    float distXZ = glm::length(glm::vec2(closestPoint.x - pos.x, closestPoint.z - pos.z));
+                    if (distXZ <= RADIUS && closestPoint.y >= pos.y - 0.5f && closestPoint.y <= pos.y + HEIGHT) {
+                        bestT = proj;
+                        bestName = species.name;
+                    }
+                }
             }
         }
     }
