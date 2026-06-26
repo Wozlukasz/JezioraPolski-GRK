@@ -139,12 +139,12 @@ void main() {
     float shadow = ShadowCalculation(FragPosLightSpace, N, L);
     
     // Light color (warm sunlight)
-    vec3 lightColor = vec3(1.0, 0.95, 0.85) * 2.5;
+    vec3 lightColor = vec3(1.0, 0.95, 0.85) * 1.2;
     
     vec3 Lo = (kD * albedo / PI + specular) * lightColor * NdotL;
     
-    // Ambient (underwater scattered light) - podniesiony, żeby tekstura była widoczna w cieniu (bardziej widoczne ryby)
-    vec3 ambient = vec3(0.75, 0.80, 0.85) * albedo;
+    // Ambient (underwater scattered light) - przyciemnione
+    vec3 ambient = vec3(0.25, 0.30, 0.35) * albedo;
     
     vec3 finalColor = ambient + (1.0 - shadow) * Lo;
     
@@ -215,8 +215,8 @@ void main() {
         float baseDensity = 0.12; // increased from 0.05
         float depthDensity = max(0.0, 64.0 - viewPos.y) * 0.005;
         float fogDensity = baseDensity + depthDensity;
-        // Gęstość mgły zredukowana do 40% dla ryb, żeby były znacznie wyraźniejsze pod wodą
-        fogFactor = 1.0 - exp(-dist * fogDensity * 0.40);
+        // Przywrócona gęstość mgły (ryby bardziej wtapiają się w tło)
+        fogFactor = 1.0 - exp(-dist * fogDensity * 0.90);
     }
     
     // Absorpcja barw pod wodą — zredukowane by dno było jaśniejsze

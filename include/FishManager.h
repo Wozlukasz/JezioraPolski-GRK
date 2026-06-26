@@ -16,6 +16,12 @@ struct Fish {
     glm::vec3 localOffset; // Fixed offset relative to the school's central path
     float panicLevel = 0.0f; // Smooth [0, 1] panic level
     glm::vec3 scatterDir;  // Unique random direction to scatter when panicked
+    
+    // --- Computed per-frame in update() ---
+    glm::vec3 currentPos;
+    glm::vec3 currentTan;
+    glm::vec3 currentNorm;
+    glm::vec3 currentBinorm;
 };
 
 struct FishSpecies {
