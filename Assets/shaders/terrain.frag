@@ -242,21 +242,33 @@ void main() {
         fogColor = vec3(0.53, 0.81, 0.92);
         fogFactor = 1.0 - exp(-dist * 0.003);
     } else if (viewPos.y < 64.0) {
-        // ---- ZUPA ZIELONA (fotorealizm wg zdjęcia) ----
-        vec3 dir = normalize(FragPos - viewPos);
-        
-        vec3 deepWater = vec3(0.23, 0.35, 0.12);
-        vec3 shallowWater = vec3(0.55, 0.67, 0.25);
-        fogColor = mix(deepWater, shallowWater, clamp(dir.y * 0.5 + 0.5, 0.0, 1.0));
-        
-        float fogDensity = 0.15;
-        
+        // Kamerzysta jest pod wodą
         if (FragPos.y > 64.0) {
+            // Fragment nad wodą (teren na brzegu). 
+            // Liczymy dystans promienia biegnącego pod wodą (od powierzchni do kamery).
+            vec3 dir = normalize(FragPos - viewPos);
             float underwaterDist = (64.0 - viewPos.y) / max(dir.y, 0.001);
+            
+            float fogDensity = 0.05 + max(0.0, 64.0 - viewPos.y) * 0.005;
             fogFactor = 1.0 - exp(-underwaterDist * fogDensity);
+            
+            fogColor = mix(vec3(0.18, 0.35, 0.22), vec3(0.10, 0.24, 0.16), clamp((64.0 - viewPos.y)/30.0, 0.0, 1.0));
+            
+            // Smugi słoneczne maskujące obiekty w mętnej wodzie
+            vec3 sunDir = normalize(vec3(0.6, 0.9, 0.4));
+            float sunDot = max(dot(dir, sunDir), 0.0);
+            float ray1 = sin(dir.x * 40.0 + time * 1.5) * cos(dir.z * 35.0 - time * 1.1);
+            float ray2 = sin(dir.x * 25.0 - time * 0.9) * cos(dir.z * 20.0 + time * 1.3);
+            float rays = smoothstep(0.6, 1.0, (ray1 + ray2) * 0.5 + 0.5);
+            fogColor += vec3(0.9, 1.0, 0.8) * rays * pow(sunDot, 2.0) * 0.8;
+            
         } else {
-            float dist = length(FragPos - viewPos);
+            // Fragment pod wodą (cały dystans przebiega w wodzie)
+            float fogDensity = 0.05 + max(0.0, 64.0 - viewPos.y) * 0.005;
             fogFactor = 1.0 - exp(-dist * fogDensity);
+            
+            float waterDepth = clamp((64.0 - FragPos.y) / 30.0, 0.0, 1.0);
+            fogColor = mix(vec3(0.18, 0.35, 0.22), vec3(0.10, 0.24, 0.16), waterDepth);
         }
     } else {
         // Kamerzysta jest nad wodą
