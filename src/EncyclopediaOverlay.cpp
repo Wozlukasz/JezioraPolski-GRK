@@ -354,12 +354,12 @@ float EncyclopediaOverlay::drawWrapped(const std::string& text,
 // drawPanel
 // ============================================================
 void EncyclopediaOverlay::drawPanel(const PlantInfo& info, float alpha, int sw, int sh) {
-    const float PAD = 14.f;
-    const float PW  = 360.f;
-    const float TH  = 20.f;
-    const float LH  = 13.f;
-    const float BH  = 12.f;
-    const float SH  = 10.5f;
+    const float PAD = 20.f;
+    const float PW  = 480.f;
+    const float TH  = 26.f;
+    const float LH  = 16.f;
+    const float BH  = 15.f;
+    const float SH  = 13.5f;
 
     float asc_title = fontAscent * (TH / ATLAS_FONT_PX);
     float asc_body  = fontAscent * (BH / ATLAS_FONT_PX);
