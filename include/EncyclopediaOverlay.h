@@ -1,6 +1,7 @@
 #pragma once
 #include <string>
 #include <map>
+#include <vector>
 #include <glad/glad.h>
 #include <glm/glm.hpp>
 
@@ -41,33 +42,48 @@ private:
     unsigned int hudShader = 0;
     bool initialized      = false;
 
+    // ---- Uniform locations (cache raz, nie per-glyph) ----
+    GLint uColor   = -1;
+    GLint uUseTex  = -1;
+    GLint uHudTex  = -1;
+
+    // ---- Text batching ----
+    // Gromadzimy werteksy w CPU, jeden draw call na flush
+    static constexpr int MAX_BATCH_QUADS = 1024; // max znakow na jeden flush
+    std::vector<float> textBatch;  // (x,y,u,v) * 6 * N
+
     // ---- Font ----
-    static constexpr float ATLAS_FONT_PX = 24.0f; // Rozmiar referencyjny atlasu
+    static constexpr float ATLAS_FONT_PX = 24.0f;
     int atlasW = 512, atlasH = 512;
     int fontAscent = 0, fontDescent = 0, fontLineGap = 0;
-    GlyphInfo glyphs[128]; // ASCII 32..127
+    GlyphInfo glyphs[128];
 
     // ---- Stan panelu ----
-    std::string lockedPlant = ""; // Gatunek aktualnie wyświetlany
-    float panelAlpha = 0.0f;     // Animacja fade-in/out
+    std::string lockedPlant = "";
+    float panelAlpha = 0.0f;
 
-    // ---- Dane encyklopedii ----
     std::map<std::string, PlantInfo> encyclopedia;
 
-    // ---- Inicjalizacja wewnętrzna ----
+    // ---- Inicjalizacja ----
     void setupQuad();
     void buildEncyclopedia();
     bool loadFont(const std::string& path);
 
     // ---- Rysowanie ----
-    void drawRect(float x, float y, float w, float h, glm::vec4 color,
-                  int sw, int sh);
-    void drawGlyph(unsigned char c, float gx, float gy_baseline,
-                   float scale, glm::vec4 color, int sw, int sh);
-    void drawText(const std::string& text, float x, float y_baseline,
+    void drawRect(float x, float y, float w, float h, glm::vec4 color, int sw, int sh);
+
+    // Batch text API:
+    // addGlyph dodaje werteksy do textBatch (brak GL calls)
+    void addGlyph(unsigned char c, float pen_x, float baseline_y,
+                  float scale, int sw, int sh);
+    // flushText wrzuca batch na GPU i rysuje jednym draw callem
+    void flushText(glm::vec4 color);
+
+    // Wysokościowe API:
+    void drawText(const std::string& text, float x, float baseline_y,
                   float pixelH, glm::vec4 color, int sw, int sh);
     float measureText(const std::string& text, float pixelH);
-    float drawWrapped(const std::string& text, float x, float y_baseline,
+    float drawWrapped(const std::string& text, float x, float baseline_y,
                       float maxW, float pixelH, glm::vec4 color, int sw, int sh);
     void drawPanel(const PlantInfo& info, float alpha, int sw, int sh);
 };
