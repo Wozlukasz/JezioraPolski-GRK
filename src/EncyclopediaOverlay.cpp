@@ -180,8 +180,8 @@ void EncyclopediaOverlay::buildEncyclopedia() {
     encyclopedia["Moczarka Kanadyjska"] = {
         "Moczarka Kanadyjska", "Elodea canadensis",
         "Popularny chwast wodny o trojlistnych okoldkach. Jedna z najszerzej rozprzestrzenionych inwazyjnych roslin w Europie.",
-        "Stojace i wolno plynacie wody, miejsca nasłonecznione lub polcieniste.",
-        "Przybyła do Europy w XIX w. i bardzo szybko opanowała rzeki i jeziora calego kontynentu."
+        "Stojace i wolno plynacie wody, miejsca naslonecznione lub polcieniste.",
+        "Przybyla do Europy w XIX w. i bardzo szybko opanowala rzeki i jeziora calego kontynentu."
     };
     encyclopedia["Rogatek Sztywny"] = {
         "Rogatek Sztywny", "Ceratophyllum demersum",
@@ -192,7 +192,7 @@ void EncyclopediaOverlay::buildEncyclopedia() {
     encyclopedia["Rogatek Krotkoszyjkowy"] = {
         "Rogatek Krotkoszyjkowy", "Ceratophyllum submersum",
         "Podobny do rogatka sztywnego, ale o migkszych lisciach i mniejszej tolerancji na chlod.",
-        "Plytkie, cieple i eutroficzne akweny, dobrze nasłonecznione.",
+        "Plytkie, cieple i eutroficzne akweny, dobrze naslonecznione.",
         "Rozmnaza sie glownie wegetatywnie przez oderwane fragmenty pedu."
     };
     encyclopedia["Tatarak"] = {
@@ -354,12 +354,15 @@ float EncyclopediaOverlay::drawWrapped(const std::string& text,
 // drawPanel
 // ============================================================
 void EncyclopediaOverlay::drawPanel(const PlantInfo& info, float alpha, int sw, int sh) {
-    const float PAD = 20.f;
-    const float PW  = 480.f;
-    const float TH  = 26.f;
-    const float LH  = 16.f;
-    const float BH  = 15.f;
-    const float SH  = 13.5f;
+    float uiScale = (float)sw / 1200.f;
+    if (uiScale < 1.0f) uiScale = 1.0f;
+    
+    const float PAD = 20.f * uiScale;
+    const float PW  = 480.f * uiScale;
+    const float TH  = 26.f * uiScale;
+    const float LH  = 16.f * uiScale;
+    const float BH  = 15.f * uiScale;
+    const float SH  = 13.5f * uiScale;
 
     float asc_title = fontAscent * (TH / ATLAS_FONT_PX);
     float asc_body  = fontAscent * (BH / ATLAS_FONT_PX);
