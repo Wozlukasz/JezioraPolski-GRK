@@ -527,3 +527,46 @@ void PlantManager::renderShadow(unsigned int shadowShader, const glm::vec3& camP
     }
     glEnable(GL_CULL_FACE);
 }
+
+// Wykrywa roślinę na celowniku metodą ray-sphere intersection.
+// Sprawdza każdy chunk każdego gatunku i zwraca nazwę najbliższej rośliny.
+std::string PlantManager::getPlantAtCrosshair(const glm::vec3& camPos, const glm::vec3& camFront, float maxDist) const {
+    // Pomijamy gatunki które nie są podwodną roślinnością (drzewa i duże rośliny)
+    static const std::vector<std::string> SKIP_SPECIES = { "Drzewo (Sosna)" };
+
+    float bestT = maxDist; // Najlepszy (najbliższy) dystans trafienia
+    std::string bestName = "";
+
+    for (const auto& species : speciesList) {
+        // Pomijamy drzewa — są za duże żeby "najeżdżać" na nie celownikiem
+        bool skip = false;
+        for (const auto& s : SKIP_SPECIES) {
+            if (species.name == s) { skip = true; break; }
+        }
+        if (skip) continue;
+
+        // Promień detekcji — dostosowany do chunku roślinnego (10m x 10m = ~7m promień + mały bufor)
+        const float HIT_RADIUS = 5.0f;
+
+        for (const auto& var : species.variants) {
+            for (const auto& chunk : var.chunks) {
+                // Ray-sphere intersection: promień = camPos + t * camFront, sfera = (chunk.center, HIT_RADIUS)
+                glm::vec3 oc = camPos - chunk.center;
+                float b = glm::dot(oc, camFront);
+                float c = glm::dot(oc, oc) - HIT_RADIUS * HIT_RADIUS;
+                float discriminant = b * b - c;
+
+                if (discriminant < 0.0f) continue; // Brak przecięcia
+
+                float t = -b - std::sqrt(discriminant);
+                if (t < 0.0f) t = -b + std::sqrt(discriminant); // Kamera wewnątrz sfery
+                if (t < 0.0f || t > bestT) continue;
+
+                bestT = t;
+                bestName = species.name;
+            }
+        }
+    }
+
+    return bestName;
+}

@@ -30,6 +30,7 @@ set(SRC_FILES
         src/BubbleSystem.cpp
         src/FishManager.cpp
         src/CubemapGenerator.cpp
+        src/EncyclopediaOverlay.cpp
         src/glad.c
 )
 

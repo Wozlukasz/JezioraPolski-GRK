@@ -9,6 +9,7 @@
 #include "BubbleSystem.h"
 #include "Camera.h"
 #include "CubemapGenerator.h"
+#include "EncyclopediaOverlay.h"
 #include "FishManager.h"
 #include "Model.h"
 #include "PlantManager.h"
@@ -159,6 +160,10 @@ int main() {
   // Bubble System
   BubbleSystem bubbleSystem;
   bubbleSystem.init();
+
+  // Encyclopedia Overlay — panel informacyjny o roślinach
+  EncyclopediaOverlay encyclopediaOverlay;
+  encyclopediaOverlay.init();
 
   // Shadow Map FBO
   const unsigned int SHADOW_WIDTH = 2048, SHADOW_HEIGHT = 2048;
@@ -621,6 +626,10 @@ int main() {
     glBindVertexArray(skyboxVAO);
     glDrawArrays(GL_TRIANGLES, 0, 36);
     glDepthFunc(GL_LESS);
+
+    // Encyklopedia roślin — ray-cast + overlay
+    std::string hoveredPlant = plantManager.getPlantAtCrosshair(cameraPos, cameraFront, 8.0f);
+    encyclopediaOverlay.render(hoveredPlant, width, height, deltaTime);
 
     glfwSwapBuffers(window);
     glfwPollEvents();

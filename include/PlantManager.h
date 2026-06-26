@@ -34,6 +34,10 @@ public:
     void render(unsigned int shader, const glm::vec3& cameraPos, const glm::mat4& vpMatrix, bool isReflection = false);
     void renderShadow(unsigned int shadowShader, const glm::vec3& cameraPos, const glm::mat4& vpMatrix);
 
+    // Zwraca nazwę gatunku rośliny, na którą patrzy kamera (ray-sphere casting po chunkach).
+    // Jeśli żadna roślina nie jest w zasięgu maxDist, zwraca pusty string.
+    std::string getPlantAtCrosshair(const glm::vec3& camPos, const glm::vec3& camFront, float maxDist = 8.0f) const;
+
 private:
     std::vector<PlantSpecies> speciesList;
     void loadSpecies(const std::string& name, const std::string& maskPath, const std::string& tuftJsonPath, const std::string& texPath, const std::vector<std::string>& variantPaths, float scaleMult = 1.0f,
