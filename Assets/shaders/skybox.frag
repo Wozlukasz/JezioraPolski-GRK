@@ -54,7 +54,7 @@ void main() {
             underwaterDist = 1000.0;
         }
         
-        float fogDensity = 0.05 + max(0.0, 64.0 - viewPos.y) * 0.005;
+        float fogDensity = 0.12 + max(0.0, 64.0 - viewPos.y) * 0.005;
         float fogFactor = 1.0 - exp(-underwaterDist * fogDensity);
         
         // Kolor mętnej wody zależy od głębokości na jakiej jesteśmy

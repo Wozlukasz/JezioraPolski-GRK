@@ -174,7 +174,25 @@ void PlantManager::loadSpecies(const std::string& name, const std::string& maskP
         if (td.height < -900.0f) continue;
         
         // Drzewa rosną tylko na suchym lądzie (brzeg > 64.5m)
-        if (maskPath.empty() && (td.height < 64.5f || td.height > 90.0f)) continue;
+        if (maskPath.empty()) {
+            if (td.height < 64.5f || td.height > 90.0f) continue;
+            
+            // Ograniczenie drzew do szerokości 50m od brzegu jeziora
+            bool nearWater = false;
+            float checkRadius = 50.0f;
+            float offsetsX[] = { checkRadius, -checkRadius, 0.0f, 0.0f };
+            float offsetsZ[] = { 0.0f, 0.0f, checkRadius, -checkRadius };
+            
+            for (int j = 0; j < 4; ++j) {
+                float h = getTerrainHeight(x + offsetsX[j], z + offsetsZ[j]);
+                // Jeśli w promieniu 50m znajduje się woda, drzewo rośnie w strefie brzegowej
+                if (h <= 64.5f && h > -900.0f) {
+                    nearWater = true;
+                    break;
+                }
+            }
+            if (!nearWater) continue; // Zbyt daleko w głąb lądu
+        }
         
         int px = 0;
         int py = 0;
@@ -298,8 +316,9 @@ void PlantManager::loadSpecies(const std::string& name, const std::string& maskP
             
             species.variants[i].chunks.push_back(chunk);
         }
+        std::cout << "  -> Chunks for variant " << i << ": " << species.variants[i].chunks.size() << std::endl;
         if (species.variants[i].hasFlatLOD) {
-            std::cout << "  -> Flat LOD chunks for variant " << i << ": " << species.variants[i].chunks.size() << std::endl;
+            std::cout << "  -> Flat LOD chunks for variant " << i << " generated." << std::endl;
         }
     }
 
@@ -393,10 +412,10 @@ void PlantManager::render(unsigned int shader, const glm::vec3& camPos, const gl
     const float CHUNK_RADIUS = 30.0f;
     
     // Potężna optymalizacja pod wodą:
-    // Skoro podwodna zupa (fogDensity = 0.15) całkowicie ukrywa widoczność po około 20-30 metrach,
+    // Skoro podwodna zupa (fogDensity = 0.20) ukrywa widoczność po kilkunastu metrach,
     // absolutnie nie ma sensu renderować we frustum milionów roślin i drzew na odległość 800m!
     if (!isReflection && camPos.y < 64.0f) {
-        RENDER_DIST = 50.0f; // Ucinamy renderowanie wszystkiego powyżej 50 metrów!
+        RENDER_DIST = 100.0f; // Zwiększony zakres renderowania pod wodą
     }
     
     GLint loc_lodFadeMode = glGetUniformLocation(shader, "lodFadeMode");
@@ -428,7 +447,7 @@ void PlantManager::render(unsigned int shader, const glm::vec3& camPos, const gl
                 // Nieskończony zasięg drzew tylko nad wodą, pod wodą stosujemy rygorystyczny RENDER_DIST (mgła i tak je ukrywa)
                 if (species.name == "Drzewo (Sosna)") {
                     if (isReflection) {
-                        currentRenderDist = 400.0f; // W odbiciach nie rysujemy drzew powyżej 400m
+                        currentRenderDist = 999999.0f; // Zwiększony zasięg w odbiciu wg prośby użytkownika
                     } else if (camPos.y >= 64.0f) {
                         currentRenderDist = 999999.0f;
                     }

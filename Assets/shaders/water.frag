@@ -176,7 +176,7 @@ void main() {
         // Mgła dopasowana do reszty podwodnego środowiska
         vec3 fogColor = vec3(0.18, 0.35, 0.22);
         float dist = length(viewPos - FragPos);
-        float fogDensity = 0.03;
+        float fogDensity = 0.10;
         float fogFactor = 1.0 - exp(-dist * fogDensity);
         waterColor = mix(waterColor, fogColor, fogFactor * 0.5);
 

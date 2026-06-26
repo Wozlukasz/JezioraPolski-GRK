@@ -212,7 +212,7 @@ void main() {
             fogFactor = 1.0 - exp(-depth * 0.12);
         }
     } else {
-        float baseDensity = 0.05; // Poprawiony realizm głębi, ok. 15m do zamglenia
+        float baseDensity = 0.12; // increased from 0.05
         float depthDensity = max(0.0, 64.0 - viewPos.y) * 0.005;
         float fogDensity = baseDensity + depthDensity;
         fogFactor = 1.0 - exp(-dist * fogDensity);

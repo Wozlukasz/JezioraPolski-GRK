@@ -211,7 +211,7 @@ void main() {
             vec3 dir = normalize(FragPos - viewPos);
             float underwaterDist = (64.0 - viewPos.y) / max(dir.y, 0.001);
             
-            float fogDensity = 0.05 + max(0.0, 64.0 - viewPos.y) * 0.005;
+            float fogDensity = 0.20 + max(0.0, 64.0 - viewPos.y) * 0.005;
             fogFactor = 1.0 - exp(-underwaterDist * fogDensity);
             
             fogColor = mix(vec3(0.18, 0.35, 0.22), vec3(0.10, 0.24, 0.16), clamp((64.0 - viewPos.y)/30.0, 0.0, 1.0));
@@ -226,7 +226,7 @@ void main() {
             
         } else {
             // Fragment pod wodą (cały dystans przebiega w wodzie)
-            float fogDensity = 0.05 + max(0.0, 64.0 - viewPos.y) * 0.005;
+            float fogDensity = 0.12 + max(0.0, 64.0 - viewPos.y) * 0.005;
             fogFactor = 1.0 - exp(-dist * fogDensity);
             
             float waterDepth = clamp((64.0 - FragPos.y) / 30.0, 0.0, 1.0);
