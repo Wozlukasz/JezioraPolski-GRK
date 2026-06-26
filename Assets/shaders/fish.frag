@@ -96,6 +96,13 @@ float caustics(vec3 pos, float t) {
 }
 
 void main() {
+    // EARLY FOG DISCARD
+    if (viewPos.y < 64.0) {
+        vec3 dir = normalize(FragPos - viewPos);
+        float underwaterDist = (FragPos.y > 64.0) ? (64.0 - viewPos.y) / max(dir.y, 0.001) : length(FragPos - viewPos);
+        if (underwaterDist * 0.15 > 5.0) discard;
+    }
+
     // Sample PBR textures
     vec3 albedo = texture(albedoMap, TexCoords).rgb;
     float roughness = texture(roughnessMap, TexCoords).r;
@@ -136,8 +143,8 @@ void main() {
     
     vec3 Lo = (kD * albedo / PI + specular) * lightColor * NdotL;
     
-    // Ambient (underwater scattered light) - podniesiony, żeby tekstura była widoczna w cieniu
-    vec3 ambient = vec3(0.50, 0.55, 0.60) * albedo;
+    // Ambient (underwater scattered light) - zmniejszony, by ryby nie "świeciły" w mroku
+    vec3 ambient = vec3(0.15, 0.20, 0.15) * albedo;
     
     vec3 finalColor = ambient + (1.0 - shadow) * Lo;
     
@@ -194,27 +201,23 @@ void main() {
         finalColor += vec3(0.20, 0.25, 0.22) * rayStrength;
     }
     
-    // ====== Underwater fog ======
-    float dist = length(viewPos - FragPos);
-    vec3 fogColor = vec3(0.12, 0.28, 0.18); // Bardziej realistyczny, mętno-zielonkawy
-    float fogFactor = 0.0;
+    // ====== Underwater fog (ZUPA ZIELONA) ======
+    vec3 dir = normalize(FragPos - viewPos);
     
-    if (viewPos.y > 64.0) {
-        if (FragPos.y < 64.0) {
-            float depth = 64.0 - FragPos.y;
-            fogFactor = 1.0 - exp(-depth * 0.12);
-        }
+    vec3 deepWater = vec3(0.23, 0.35, 0.12);
+    vec3 shallowWater = vec3(0.55, 0.67, 0.25);
+    vec3 fogColor = mix(deepWater, shallowWater, clamp(dir.y * 0.5 + 0.5, 0.0, 1.0));
+    
+    float fogDensity = 0.15;
+    float fogFactor;
+    
+    if (viewPos.y >= 64.0) {
+        vec3 viewDir = normalize(viewPos - FragPos);
+        float waterDist = (64.0 - FragPos.y) / max(viewDir.y, 0.001);
+        fogFactor = 1.0 - exp(-waterDist * fogDensity);
     } else {
-        float baseDensity = 0.05; // Poprawiony realizm głębi, ok. 15m do zamglenia
-        float depthDensity = max(0.0, 64.0 - viewPos.y) * 0.005;
-        float fogDensity = baseDensity + depthDensity;
+        float dist = length(FragPos - viewPos);
         fogFactor = 1.0 - exp(-dist * fogDensity);
-    }
-    
-    // Absorpcja barw pod wodą — zredukowane by dno było jaśniejsze
-    if (FragPos.y < 64.0) {
-        float waterDepth = clamp((64.0 - FragPos.y) / 30.0, 0.0, 1.0);
-        fogColor = mix(vec3(0.18, 0.35, 0.22), vec3(0.10, 0.24, 0.16), waterDepth);
     }
     
     finalColor = mix(finalColor, fogColor, fogFactor);

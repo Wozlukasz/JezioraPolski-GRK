@@ -107,6 +107,14 @@ float caustics(vec3 pos, float time) {
 void main() {
     if (clipMode == 1 && FragPos.y < clipY) discard;
     
+    // Potężna optymalizacja karty graficznej: jeśli fragment jest całkowicie w gęstej zielonej zupie (powyżej 33 metrów),
+    // odrzucamy go NATYCHMIAST. W jego miejsce i tak narysuje się jednolity kolor zupy ze skyboxa!
+    if (viewPos.y < 64.0 && !isReflectionPass) {
+        vec3 dir = normalize(FragPos - viewPos);
+        float underwaterDist = (FragPos.y > 64.0) ? (64.0 - viewPos.y) / max(dir.y, 0.001) : length(FragPos - viewPos);
+        if (underwaterDist * 0.15 > 5.0) discard;
+    }
+    
     float y = FragPos.y;
     
     // Zwiększamy krotność UV z 150 do 300, aby tekstura gruntu wydawała się drobniejsza
@@ -233,44 +241,44 @@ void main() {
         finalColor += vec3(0.20, 0.25, 0.22) * rayStrength;
     }
 
-    // ======== MGŁA PODWODNA ========
+    // ======== MGŁA ========
     float dist = length(viewPos - FragPos);
-    vec3 fogColor = vec3(0.18, 0.35, 0.22);
-    float fogFactor = 0.0;
     
-    if (isReflectionPass) {
-        fogColor = vec3(0.53, 0.81, 0.92);
-        fogFactor = 1.0 - exp(-dist * 0.003);
-    } else if (viewPos.y < 64.0) {
-        // ---- ZUPA ZIELONA (fotorealizm wg zdjęcia) ----
-        vec3 dir = normalize(FragPos - viewPos);
+    if (viewPos.y >= 64.0 || isReflectionPass) {
+        // ---- REALISTIC FOG NAD WODĄ (mgła atmosferyczna) ----
+        // Odbicia zawsze używają mgły nadwodnej, bo światło odbija się OD tafli, nie wchodzi pod wodę!
+        vec3 fogColor = vec3(0.53, 0.81, 0.92);
+        float fogFactor = 1.0 - exp(-dist * 0.003);
+        finalColor = mix(finalColor, fogColor, fogFactor);
         
+        // Dodatkowy pass dla terenu widocznego przez taflę wody z góry
+        if (FragPos.y < 64.0 && !isReflectionPass) {
+            vec3 dir = normalize(viewPos - FragPos);
+            float waterDist = (64.0 - FragPos.y) / max(dir.y, 0.001);
+            vec3 deepWater = vec3(0.23, 0.35, 0.12);
+            vec3 shallowWater = vec3(0.55, 0.67, 0.25);
+            vec3 waterFogColor = mix(deepWater, shallowWater, clamp(dir.y * 0.5 + 0.5, 0.0, 1.0));
+            float waterFogFactor = 1.0 - exp(-waterDist * 0.15);
+            finalColor = mix(finalColor, waterFogColor, waterFogFactor);
+        }
+    } else {
+        // ---- ZUPA ZIELONA (fotorealizm wg zdjęcia) pod wodą ----
+        vec3 dir = normalize(FragPos - viewPos);
         vec3 deepWater = vec3(0.23, 0.35, 0.12);
         vec3 shallowWater = vec3(0.55, 0.67, 0.25);
-        fogColor = mix(deepWater, shallowWater, clamp(dir.y * 0.5 + 0.5, 0.0, 1.0));
+        vec3 fogColor = mix(deepWater, shallowWater, clamp(dir.y * 0.5 + 0.5, 0.0, 1.0));
         
         float fogDensity = 0.15;
+        float fogFactor;
         
         if (FragPos.y > 64.0) {
             float underwaterDist = (64.0 - viewPos.y) / max(dir.y, 0.001);
             fogFactor = 1.0 - exp(-underwaterDist * fogDensity);
         } else {
-            float dist = length(FragPos - viewPos);
             fogFactor = 1.0 - exp(-dist * fogDensity);
         }
-    } else {
-        // Kamerzysta jest nad wodą
-        if (FragPos.y > 64.0) {
-            fogColor = vec3(0.53, 0.81, 0.92);
-            fogFactor = 1.0 - exp(-dist * 0.003);
-        } else {
-            fogFactor = 1.0 - exp(-(64.0 - FragPos.y) * 0.12);
-            float waterDepth = clamp((64.0 - FragPos.y) / 30.0, 0.0, 1.0);
-            fogColor = mix(vec3(0.18, 0.35, 0.22), vec3(0.10, 0.24, 0.16), waterDepth);
-        }
+        finalColor = mix(finalColor, fogColor, fogFactor);
     }
-
-    finalColor = mix(finalColor, fogColor, fogFactor);
 
     FragColor = vec4(finalColor, 1.0);
 }

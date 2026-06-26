@@ -147,20 +147,22 @@ void PlantManager::loadSpecies(const std::string& name, const std::string& maskP
     }
 
     std::mt19937 engine(std::hash<std::string>{}(name));
-    std::uniform_real_distribution<float> distX(-400.0f, 400.0f);
-    std::uniform_real_distribution<float> distZ(-400.0f, 400.0f);
+    // Teren w pliku OBJ sięga od -750 do 750. Szukamy w przedziale od -800 do 800, by pokryć całą maskę.
+    std::uniform_real_distribution<float> distX(-800.0f, 800.0f);
+    std::uniform_real_distribution<float> distZ(-800.0f, 800.0f);
     std::uniform_real_distribution<float> rotDist(0.0f, 360.0f);
 
     std::vector<std::map<std::pair<int, int>, std::vector<glm::mat4>>> variantChunkedMatrices(species.variants.size());
         std::vector<std::map<std::pair<int, int>, std::vector<glm::mat4>>> variantFlatChunkedMatrices(species.variants.size());
 
-    // Gęsta dżungla podwodna — dużo prób spawnowania
-    int numSpawnAttempts = hasTuft ? 80000 : 400000;
-    if (name == "Tatarak") numSpawnAttempts = 6000000;
+    // Gęsta dżungla podwodna — adekwatnie więcej prób dla powiększonego terenu
+    int numSpawnAttempts = hasTuft ? 300000 : 1500000;
+    if (name == "Tatarak") numSpawnAttempts = 15000000;
     
     // Znacznie zmniejszona skala, aby zrealizować prośbę o mniejsze wodorosty
-    std::uniform_real_distribution<float> randomScaleXZ(0.4f, 0.85f); 
-    std::uniform_real_distribution<float> randomScaleY(0.35f, 1.0f); 
+    // Zwiększony rozrzut losowego skalowania, aby wodorosty były bardzo zróżnicowane
+    std::uniform_real_distribution<float> randomScaleXZ(0.4f, 1.3f); 
+    std::uniform_real_distribution<float> randomScaleY(0.4f, 1.8f); 
     
     // Bierzemy co 4-ty element kępki (balans gęstość / wydajność)
     int tuftStride = 4;
@@ -247,7 +249,8 @@ void PlantManager::loadSpecies(const std::string& name, const std::string& maskP
                     if (species.variants[varIdx].hasFlatLOD) {
                         glm::mat4 flatM = glm::translate(glm::mat4(1.0f), glm::vec3(worldX, currentY, worldZ));
                         flatM = glm::rotate(flatM, glm::radians(tuftRot), glm::vec3(0,1,0));
-                        flatM = glm::scale(flatM, currentScaleVec);
+                        flatM = glm::rotate(flatM, glm::radians(ry), glm::vec3(0,1,0));
+                        flatM = glm::scale(flatM, glm::vec3(sx, sy, sz) * currentScaleVec);
                         variantFlatChunkedMatrices[varIdx][{chunkX, chunkZ}].push_back(flatM);
                     }
                 }
@@ -380,11 +383,19 @@ void PlantManager::render(unsigned int shader, const glm::vec3& camPos, const gl
     glm::vec2 camPos2D(camPos.x, camPos.z);
     auto frustumPlanes = extractFrustumPlanes(vpMatrix);
     
-    // Próg LOD: poniżej tego dystansu → szczegółowe, powyżej → flat.
-    float LOD_THRESHOLD = isReflection ? 25.0f : 40.0f;  // Dystans przejścia detail→flat 
+    // Użytkownik zażądał CAŁKOWITEGO WYŁĄCZENIA modeli szczegółowych. 
+    // Wymuszamy próg LOD na 0.0, aby od razu przed kamerą ładowały się płaskie modele.
+    float LOD_THRESHOLD = 0.0f;
     float FADE_BAND = 10.0f;      // Strefa crossfade między modelami
-    float RENDER_DIST = isReflection ? 300.0f : 800.0f;
+    float RENDER_DIST = isReflection ? 150.0f : 800.0f;
     const float CHUNK_RADIUS = 10.0f;   // Bardziej konserwatywny promień chunka
+    
+    // Potężna optymalizacja pod wodą:
+    // Skoro podwodna zupa (fogDensity = 0.15) całkowicie ukrywa widoczność po około 20-30 metrach,
+    // absolutnie nie ma sensu renderować we frustum milionów roślin i drzew na odległość 800m!
+    if (!isReflection && camPos.y < 64.0f) {
+        RENDER_DIST = 50.0f; // Ucinamy renderowanie wszystkiego powyżej 50 metrów!
+    }
     
     GLint loc_lodFadeMode = glGetUniformLocation(shader, "lodFadeMode");
     GLint loc_lodThreshold = glGetUniformLocation(shader, "lodThreshold");
@@ -397,9 +408,6 @@ void PlantManager::render(unsigned int shader, const glm::vec3& camPos, const gl
     for (auto& species : speciesList) {
         glUniform1i(loc_isTree, (species.name == "Drzewo (Sosna)") ? 1 : 0);
         
-        // === Zbierz zbiór chunków blisko (detail) ===
-        // Używamy chunk center distance do podjęcia decyzji: detail czy flat
-        
         // PASS 1: Szczegółowe modele (chunki bliskie kamery)
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, species.textureDiffuse);
@@ -410,22 +418,26 @@ void PlantManager::render(unsigned int shader, const glm::vec3& camPos, const gl
                 float dist = glm::distance(chunkPos2D, camPos2D);
                 
                 float currentChunkRadius = CHUNK_RADIUS;
-                if (species.name == "Drzewo (Sosna)") currentChunkRadius = 45.0f; // Drzewa są potężne, frustum culling nie może ucinać ich po liściach!
+                if (species.name == "Drzewo (Sosna)") currentChunkRadius = 45.0f; // Drzewa są potężne
 
                 bool inFrustum = sphereInFrustum(frustumPlanes, chunk.center, currentChunkRadius);
                 
-                // Detail mode:
-                // - Bez flat LOD: renderuj zawsze w zasięgu RENDER_DIST
-                // - Z flat LOD: renderuj gdy dist < LOD_THRESHOLD+FADE_BAND (krzyżuje się z flat)
                 float currentRenderDist = RENDER_DIST;
-                if (species.name == "Drzewo (Sosna)") currentRenderDist = 999999.0f;
+                // Nieskończony zasięg drzew tylko nad wodą, pod wodą stosujemy rygorystyczny RENDER_DIST (mgła i tak je ukrywa)
+                if (species.name == "Drzewo (Sosna)") {
+                    if (isReflection) {
+                        currentRenderDist = 400.0f; // W odbiciach nie rysujemy drzew powyżej 400m
+                    } else if (camPos.y >= 64.0f) {
+                        currentRenderDist = 999999.0f;
+                    }
+                }
                 
                 bool useDetail;
                 if (!var.hasFlatLOD) {
                     useDetail = (dist < currentRenderDist + currentChunkRadius);
                 } else {
-                    // Renderuj szczegóły aż do LOD_THRESHOLD+FADE_BAND żeby nie było dziury
-                    useDetail = (dist < LOD_THRESHOLD + FADE_BAND + currentChunkRadius);
+                    // Na polecenie użytkownika: CAŁKOWICIE wyłączamy szczegółowe modele dla roślin, które mają płaskie odpowiedniki.
+                    useDetail = false;
                 }
                 
                 if (useDetail && inFrustum) {
@@ -451,7 +463,9 @@ void PlantManager::render(unsigned int shader, const glm::vec3& camPos, const gl
                 bool inFrustum = sphereInFrustum(frustumPlanes, chunk.center, CHUNK_RADIUS);
                 // Flat LOD: render od progu LOD (z nakładką FADE_BAND) do końca widoczności
                 float currentFlatRenderDist = RENDER_DIST;
-                if (species.name == "Tatarak" || species.name == "Drzewo (Sosna)") currentFlatRenderDist = 999999.0f;
+                if ((species.name == "Tatarak" || species.name == "Drzewo (Sosna)") && (isReflection || camPos.y >= 64.0f)) {
+                    currentFlatRenderDist = 999999.0f;
+                }
                 
                 // Zaczyna się FADE_BAND przed progiem LOD (overlap z detail)
                 bool useFlat = (dist >= LOD_THRESHOLD - FADE_BAND) && (dist < currentFlatRenderDist + CHUNK_RADIUS);

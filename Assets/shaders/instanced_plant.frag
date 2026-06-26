@@ -60,6 +60,13 @@ uniform bool isTree;
 void main() {
     if (clipMode == 1 && FragPos.y < clipY) discard;
 
+    // Potężna optymalizacja GPU pod wodą (odrzucamy fragmenty całkowicie ukryte w "zupie" przed ciężkimi obliczeniami)
+    if (viewPos.y < 64.0 && !isReflectionPass) {
+        vec3 dir = normalize(FragPos - viewPos);
+        float underwaterDist = (FragPos.y > 64.0) ? (64.0 - viewPos.y) / max(dir.y, 0.001) : length(FragPos - viewPos);
+        if (underwaterDist * 0.15 > 5.0) discard;
+    }
+
     vec4 texColor = texture(texture_diffuse1, TexCoords);
     
     // Mipmapy powodują rozmycie kanału alpha, przez co cienkie modele tataraku znikają!
@@ -119,7 +126,16 @@ void main() {
         float NdotL = NdotL_front + NdotL_back * 0.4;
         
         vec3 lightColor = vec3(1.0, 0.95, 0.85) * 2.5;
-        vec3 ambient = vec3(0.50, 0.55, 0.45) * albedo;
+        vec3 ambient;
+        if (viewPos.y < 64.0) {
+            // Pod wodą - bardzo mroczny, zielony ambient by ukryć "kartonowy" wygląd
+            ambient = vec3(0.15, 0.25, 0.15) * albedo;
+            // Światło docierające pod wodę jest znacznie słabsze i rozproszone
+            lightColor = vec3(0.4, 0.5, 0.35); 
+        } else {
+            ambient = vec3(0.50, 0.55, 0.45) * albedo;
+        }
+        
         vec3 diffuse = albedo / PI * lightColor * NdotL;
         
         finalColor = ambient + diffuse;
@@ -195,44 +211,43 @@ void main() {
         finalColor += vec3(0.20, 0.25, 0.22) * rayStrength;
     }
     
-    // ======== MGŁA PODWODNA ========
+    // ======== MGŁA ========
     float dist = length(viewPos - FragPos);
-    vec3 fogColor = vec3(0.18, 0.35, 0.22);
-    float fogFactor = 0.0;
     
-    if (isReflectionPass) {
-        fogColor = vec3(0.53, 0.81, 0.92);
-        fogFactor = 1.0 - exp(-dist * 0.003);
-    } else if (viewPos.y < 64.0) {
-        // ---- ZUPA ZIELONA (fotorealizm wg zdjęcia) ----
-        vec3 dir = normalize(FragPos - viewPos);
+    if (viewPos.y >= 64.0 || isReflectionPass) {
+        // ---- REALISTIC FOG NAD WODĄ (mgła atmosferyczna) ----
+        vec3 fogColor = vec3(0.53, 0.81, 0.92);
+        float fogFactor = 1.0 - exp(-dist * 0.003);
+        finalColor = mix(finalColor, fogColor, fogFactor);
         
+        // Dodatkowy pass dla obiektów widocznych przez taflę wody z góry
+        if (FragPos.y < 64.0 && !isReflectionPass) {
+            vec3 dir = normalize(viewPos - FragPos);
+            float waterDist = (64.0 - FragPos.y) / max(dir.y, 0.001);
+            vec3 deepWater = vec3(0.23, 0.35, 0.12);
+            vec3 shallowWater = vec3(0.55, 0.67, 0.25);
+            vec3 waterFogColor = mix(deepWater, shallowWater, clamp(dir.y * 0.5 + 0.5, 0.0, 1.0));
+            float waterFogFactor = 1.0 - exp(-waterDist * 0.15);
+            finalColor = mix(finalColor, waterFogColor, waterFogFactor);
+        }
+    } else {
+        // ---- ZUPA ZIELONA (fotorealizm wg zdjęcia) pod wodą ----
+        vec3 dir = normalize(FragPos - viewPos);
         vec3 deepWater = vec3(0.23, 0.35, 0.12);
         vec3 shallowWater = vec3(0.55, 0.67, 0.25);
-        fogColor = mix(deepWater, shallowWater, clamp(dir.y * 0.5 + 0.5, 0.0, 1.0));
+        vec3 fogColor = mix(deepWater, shallowWater, clamp(dir.y * 0.5 + 0.5, 0.0, 1.0));
         
         float fogDensity = 0.15;
+        float fogFactor;
         
         if (FragPos.y > 64.0) {
             float underwaterDist = (64.0 - viewPos.y) / max(dir.y, 0.001);
             fogFactor = 1.0 - exp(-underwaterDist * fogDensity);
         } else {
-            float dist = length(FragPos - viewPos);
             fogFactor = 1.0 - exp(-dist * fogDensity);
         }
-    } else {
-        // Kamerzysta jest nad wodą
-        if (FragPos.y > 64.0) {
-            fogColor = vec3(0.53, 0.81, 0.92);
-            fogFactor = 1.0 - exp(-dist * 0.003);
-        } else {
-            fogFactor = 1.0 - exp(-(64.0 - FragPos.y) * 0.12);
-            float waterDepth = clamp((64.0 - FragPos.y) / 30.0, 0.0, 1.0);
-            fogColor = mix(vec3(0.18, 0.35, 0.22), vec3(0.10, 0.24, 0.16), waterDepth);
-        }
+        finalColor = mix(finalColor, fogColor, fogFactor);
     }
-    
-    finalColor = mix(finalColor, fogColor, fogFactor);
     
     // Kluczowa poprawka: Wymuszamy alpha = 1.0. Przezroczystość roślin i tak jest
     // obcinana (discard) testem alpha. Wypuszczenie mniejszego alpha powodowało

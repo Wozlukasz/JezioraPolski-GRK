@@ -159,28 +159,28 @@ void FishManager::init() {
     // Gracz startuje na (32, ~66, 38) — ławice muszą być pod nim i w zasięgu wzroku
 
     // === BLISKO GRACZA — od razu widoczne po wejściu do wody ===
-    spawnSchool(0, glm::vec3(28.0f, 57.0f, 35.0f), 18.0f, 50, 0.007f, 52.0f, 61.0f);
-    spawnSchool(1, glm::vec3(22.0f, 59.0f, 30.0f), 12.0f, 60, 0.009f, 55.0f, 62.0f);
-    spawnSchool(0, glm::vec3(35.0f, 55.0f, 28.0f), 15.0f, 45, 0.008f, 50.0f, 59.0f);
+    spawnSchool(0, glm::vec3(28.0f, 57.0f, 35.0f), 18.0f, 15, 0.007f, 52.0f, 61.0f);
+    spawnSchool(1, glm::vec3(22.0f, 59.0f, 30.0f), 12.0f, 18, 0.009f, 55.0f, 62.0f);
+    spawnSchool(0, glm::vec3(35.0f, 55.0f, 28.0f), 15.0f, 12, 0.008f, 50.0f, 59.0f);
 
     // === ŚRODEK JEZIORA — duże ławice ===
-    spawnSchool(1, glm::vec3(10.0f, 57.0f, 10.0f), 25.0f, 80, 0.008f, 53.0f, 61.0f);
-    spawnSchool(0, glm::vec3(0.0f, 54.0f, 0.0f),   30.0f, 60, 0.006f, 48.0f, 58.0f);
-    spawnSchool(1, glm::vec3(-5.0f, 58.0f, 5.0f),  20.0f, 55, 0.007f, 54.0f, 62.0f);
+    spawnSchool(1, glm::vec3(10.0f, 57.0f, 10.0f), 25.0f, 25, 0.008f, 53.0f, 61.0f);
+    spawnSchool(0, glm::vec3(0.0f, 54.0f, 0.0f),   30.0f, 20, 0.006f, 48.0f, 58.0f);
+    spawnSchool(1, glm::vec3(-5.0f, 58.0f, 5.0f),  20.0f, 18, 0.007f, 54.0f, 62.0f);
 
     // === DALSZE CZĘŚCI JEZIORA ===
-    spawnSchool(0, glm::vec3(-20.0f, 53.0f, 20.0f),  22.0f, 40, 0.005f, 48.0f, 57.0f);
-    spawnSchool(1, glm::vec3(-15.0f, 56.0f, -10.0f), 18.0f, 45, 0.007f, 52.0f, 60.0f);
-    spawnSchool(0, glm::vec3(15.0f, 52.0f, -15.0f),  20.0f, 35, 0.005f, 46.0f, 56.0f);
+    spawnSchool(0, glm::vec3(-20.0f, 53.0f, 20.0f),  22.0f, 12, 0.005f, 48.0f, 57.0f);
+    spawnSchool(1, glm::vec3(-15.0f, 56.0f, -10.0f), 18.0f, 15, 0.007f, 52.0f, 60.0f);
+    spawnSchool(0, glm::vec3(15.0f, 52.0f, -15.0f),  20.0f, 10, 0.005f, 46.0f, 56.0f);
 
     // === NOWE DODATKOWE ŁAWICE ===
-    spawnSchool(1, glm::vec3(40.0f, 54.0f, 10.0f),   15.0f, 40, 0.008f, 48.0f, 58.0f);
-    spawnSchool(0, glm::vec3(-35.0f, 56.0f, -30.0f),  22.0f, 45, 0.006f, 50.0f, 60.0f);
-    spawnSchool(1, glm::vec3(5.0f, 58.0f, 45.0f),    18.0f, 50, 0.007f, 53.0f, 62.0f);
+    spawnSchool(1, glm::vec3(40.0f, 54.0f, 10.0f),   15.0f, 12, 0.008f, 48.0f, 58.0f);
+    spawnSchool(0, glm::vec3(-35.0f, 56.0f, -30.0f),  22.0f, 14, 0.006f, 50.0f, 60.0f);
+    spawnSchool(1, glm::vec3(5.0f, 58.0f, 45.0f),    18.0f, 16, 0.007f, 53.0f, 62.0f);
 
     // === GŁĘBINY — wolniejsze, tajemnicze ===
-    spawnSchool(0, glm::vec3(5.0f, 46.0f, -5.0f),   25.0f, 30, 0.003f, 42.0f, 50.0f);
-    spawnSchool(0, glm::vec3(-10.0f, 44.0f, 0.0f),  20.0f, 25, 0.002f, 40.0f, 48.0f);
+    spawnSchool(0, glm::vec3(5.0f, 46.0f, -5.0f),   25.0f, 8, 0.003f, 42.0f, 50.0f);
+    spawnSchool(0, glm::vec3(-10.0f, 44.0f, 0.0f),  20.0f, 6, 0.002f, 40.0f, 48.0f);
 
     std::cout << "FishManager: zainicjalizowano " << fishes.size() << " ryb" << std::endl;
 }
