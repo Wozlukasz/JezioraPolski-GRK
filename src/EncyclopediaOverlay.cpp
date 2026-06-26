@@ -172,49 +172,49 @@ bool EncyclopediaOverlay::loadFont(const std::string& path) {
 void EncyclopediaOverlay::buildEncyclopedia() {
     encyclopedia["Moczarka Delikatna"] = {
         "Moczarka Delikatna", "Elodea nuttallii",
-        "Drobna roslina zanurzona w wodzie. Pochodzi z Ameryki Polnocnej i zostala zawleczona do Europy jako roslina akwariowa w XIX w.",
+        "Drobna roslina zanurzona w wodzie. Pochodzi z Ameryki Polnocnej i zostala zawleczona do Europy w XIX w. Klasyfikowana jako inwazyjny gatunek obcy (IGO).",
         "Strefa litoralna jezior i kanaly o czystej lub umiarkowanie zeutrofizowanej wodzie.",
         "Tworzy geste lany stanowiace doskonale kryjowki dla narybku i drobnych bezkregowcow."
     };
     encyclopedia["Mech Zdrojek"] = {
         "Mech Zdrojek", "Fontinalis antipyretica",
-        "Jeden z najwiekszych mchow wodnych w Europie. Rosnie przytwierdzona do kamieni, tworzac dlugie ciemne wstegi.",
+        "Jeden z najwiekszych mchow wodnych w Europie (gatunek rodzimy, nie inwazyjny). Rosnie przytwierdzona do kamieni, tworzac dlugie ciemne wstegi.",
         "Czyste, zimne wody plynace i jeziorowe, dobrze natlenione.",
         "Dawniej uzywana do uszczelniania szpar w budowlach. Bardzo wrazliwa na zanieczyszczenia."
     };
     encyclopedia["Moczarka Kanadyjska"] = {
         "Moczarka Kanadyjska", "Elodea canadensis",
-        "Popularny chwast wodny o trojlistnych okoldkach. Jedna z najszerzej rozprzestrzenionych inwazyjnych roslin w Europie.",
+        "Popularny chwast wodny o trojlistnych okoldkach. Wysoce agresywny, inwazyjny gatunek obcy (IGO) w Europie.",
         "Stojace i wolno plynace wody, miejsca naslonecznione lub polcieniste.",
         "Przybyla do Europy w XIX w. i bardzo szybko opanowala rzeki i jeziora calego kontynentu."
     };
     encyclopedia["Rogatek Sztywny"] = {
         "Rogatek Sztywny", "Ceratophyllum demersum",
-        "Roslina zanurzona, bez korzeni. Dryfuje lub zakotwicza sie miedzy roslinami. Liscie rozwidlone jak poroze.",
+        "Rodzima roslina zanurzona, bez korzeni (nie inwazyjna). Dryfuje lub zakotwicza sie miedzy roslinami. Liscie rozwidlone jak poroze.",
         "Wody stojace i wolno plynace, bogate w zwiazki biogenne.",
         "W sloneczny dzien produkuje duze ilosci tlenu, co korzystnie wplywa na zycie w jeziorze."
     };
     encyclopedia["Rogatek Krotkoszyjkowy"] = {
         "Rogatek Krotkoszyjkowy", "Ceratophyllum submersum",
-        "Podobny do rogatka sztywnego, ale o miekszych lisciach i mniejszej tolerancji na chlod.",
+        "Podobny do rogatka sztywnego, ale o miekszych lisciach i mniejszej tolerancji na chlod. Jest to gatunek rodzimy.",
         "Plytkie, cieple i eutroficzne akweny, dobrze naslonecznione.",
         "Rozmnaza sie glownie wegetatywnie przez oderwane fragmenty pedu."
     };
     encyclopedia["Tatarak"] = {
         "Tatarak Zwyczajny", "Acorus calamus",
-        "Okazala roslina szuwarowa o lancetowatych, aromatycznych lisciach, ponad 1 m wysokosci.",
+        "Okazala roslina szuwarowa o lancetowatych, aromatycznych lisciach. Traktowana jako gatunek obcy (zawleczony), ale zadomowiony.",
         "Brzegi jezior i rzek w strefie plytkowodnej.",
         "Klacze sa uzywane w ziololecznictwie i perfumerstwie. Olejki eteryczne dzialaja antyseptycznie."
     };
     encyclopedia["Osoka Woda"] = {
         "Osoka Aloesowata", "Stratiotes aloides",
-        "Roslina plywajaca — latem wynurza sie z wody, zima opada na dno i przezimuje w spoczynku. Liscie kolczaste.",
+        "Rodzima roslina plywajaca (nie inwazyjna) — latem wynurza sie z wody, zima opada na dno i przezimuje w spoczynku.",
         "Plytkie, czyste jeziora o wysokiej zawartosci wapnia.",
         "Chroniona w Polsce. Skupiska sa schronieniem dla wielu bezkregowcow."
     };
     encyclopedia["Osoka Brzeg"] = {
         "Osoka Aloesowata", "Stratiotes aloides",
-        "Egzemplarze brzegowe z grubymi lisciami zakonczonymi ostrymi kolcami, podobnymi do aloesa.",
+        "Egzemplarze brzegowe z grubymi lisciami zakonczonymi ostrymi kolcami. Gatunek rodzimy, ekologicznie bezpieczny.",
         "Strefa plycizny przybrzeznej o czystej, bogatej w wapn wodzie.",
         "Im wiecej osoki w jeziorze, tym lepsza jakosc wody — naturalny wskaznik ekologiczny."
     };
