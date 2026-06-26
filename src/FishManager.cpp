@@ -247,7 +247,7 @@ void FishManager::update(float deltaTime, const glm::vec3& cameraPos, bool feedi
         }
 
         // Advance along path (globally slowed down to swim slower and more gracefully)
-        fish.t += fish.speed * 0.25f * currentSpeedMult * deltaTime;
+        fish.t += fish.speed * 0.08f * currentSpeedMult * deltaTime;
         if (fish.t >= 1.0f) fish.t -= 1.0f;
         if (fish.t < 0.0f)  fish.t += 1.0f;
     }
@@ -293,7 +293,7 @@ void FishManager::render(unsigned int shader, const glm::mat4& view, const glm::
         glm::vec3 interpBinorm = glm::normalize(glm::mix(f1.binormal, f2.binormal, frac));
 
         // Build model matrix from interpolated frame + scale (increased size)
-        float scale = (fish.speciesIndex == 0) ? 3.0f : 2.0f;
+        float scale = (fish.speciesIndex == 0) ? 7.0f : 5.0f;
         
         // Bazowa pozycja ryby w świecie (przed paniką / przyciąganiem)
         glm::vec3 baseWorldPos = interpPos 
@@ -414,7 +414,7 @@ void FishManager::renderShadow(unsigned int shadowShader, const glm::mat4& light
         glm::vec3 interpNorm = glm::normalize(glm::mix(f1.normal, f2.normal, frac));
         glm::vec3 interpBinorm = glm::normalize(glm::mix(f1.binormal, f2.binormal, frac));
 
-        float scale = (fish.speciesIndex == 0) ? 3.0f : 2.0f;
+        float scale = (fish.speciesIndex == 0) ? 7.0f : 5.0f;
         
         // Bazowa pozycja ryby w świecie (przed paniką / przyciąganiem)
         glm::vec3 baseWorldPos = interpPos 

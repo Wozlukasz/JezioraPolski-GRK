@@ -143,8 +143,8 @@ void main() {
     
     vec3 Lo = (kD * albedo / PI + specular) * lightColor * NdotL;
     
-    // Ambient (underwater scattered light) - podniesiony, żeby tekstura była widoczna w cieniu
-    vec3 ambient = vec3(0.50, 0.55, 0.60) * albedo;
+    // Ambient (underwater scattered light) - podniesiony, żeby tekstura była widoczna w cieniu (bardziej widoczne ryby)
+    vec3 ambient = vec3(0.75, 0.80, 0.85) * albedo;
     
     vec3 finalColor = ambient + (1.0 - shadow) * Lo;
     
@@ -215,7 +215,8 @@ void main() {
         float baseDensity = 0.12; // increased from 0.05
         float depthDensity = max(0.0, 64.0 - viewPos.y) * 0.005;
         float fogDensity = baseDensity + depthDensity;
-        fogFactor = 1.0 - exp(-dist * fogDensity);
+        // Gęstość mgły zredukowana do 40% dla ryb, żeby były znacznie wyraźniejsze pod wodą
+        fogFactor = 1.0 - exp(-dist * fogDensity * 0.40);
     }
     
     // Absorpcja barw pod wodą — zredukowane by dno było jaśniejsze
