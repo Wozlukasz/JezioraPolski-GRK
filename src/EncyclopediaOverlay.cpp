@@ -174,31 +174,31 @@ void EncyclopediaOverlay::buildEncyclopedia() {
     encyclopedia["Mech Zdrojek"] = {
         "Mech Zdrojek", "Fontinalis antipyretica",
         "Jeden z najwiekszych mchow wodnych w Europie. Rosnie przytwierdzona do kamieni, tworzac dlugie ciemne wstegi.",
-        "Czyste, zimne wody plynacie i jeziorowe, dobrze natlenione.",
+        "Czyste, zimne wody plynace i jeziorowe, dobrze natlenione.",
         "Dawniej uzywana do uszczelniania szpar w budowlach. Bardzo wrazliwa na zanieczyszczenia."
     };
     encyclopedia["Moczarka Kanadyjska"] = {
         "Moczarka Kanadyjska", "Elodea canadensis",
         "Popularny chwast wodny o trojlistnych okoldkach. Jedna z najszerzej rozprzestrzenionych inwazyjnych roslin w Europie.",
-        "Stojace i wolno plynacie wody, miejsca naslonecznione lub polcieniste.",
+        "Stojace i wolno plynace wody, miejsca naslonecznione lub polcieniste.",
         "Przybyla do Europy w XIX w. i bardzo szybko opanowala rzeki i jeziora calego kontynentu."
     };
     encyclopedia["Rogatek Sztywny"] = {
         "Rogatek Sztywny", "Ceratophyllum demersum",
         "Roslina zanurzona, bez korzeni. Dryfuje lub zakotwicza sie miedzy roslinami. Liscie rozwidlone jak poroze.",
-        "Wody stojace i wolno plynacie, bogate w zwiazki biogenne.",
+        "Wody stojace i wolno plynace, bogate w zwiazki biogenne.",
         "W sloneczny dzien produkuje duze ilosci tlenu, co korzystnie wplywa na zycie w jeziorze."
     };
     encyclopedia["Rogatek Krotkoszyjkowy"] = {
         "Rogatek Krotkoszyjkowy", "Ceratophyllum submersum",
-        "Podobny do rogatka sztywnego, ale o migkszych lisciach i mniejszej tolerancji na chlod.",
+        "Podobny do rogatka sztywnego, ale o miekszych lisciach i mniejszej tolerancji na chlod.",
         "Plytkie, cieple i eutroficzne akweny, dobrze naslonecznione.",
         "Rozmnaza sie glownie wegetatywnie przez oderwane fragmenty pedu."
     };
     encyclopedia["Tatarak"] = {
         "Tatarak Zwyczajny", "Acorus calamus",
         "Okazala roslina szuwarowa o lancetowatych, aromatycznych lisciach, ponad 1 m wysokosci.",
-        "Brzegi jezior i rzek w strefie płytkowodnej.",
+        "Brzegi jezior i rzek w strefie plytkowodnej.",
         "Klacze sa uzywane w ziololecznictwie i perfumerstwie. Olejki eteryczne dzialaja antyseptycznie."
     };
     encyclopedia["Osoka Woda"] = {
@@ -209,7 +209,7 @@ void EncyclopediaOverlay::buildEncyclopedia() {
     };
     encyclopedia["Osoka Brzeg"] = {
         "Osoka Aloesowata", "Stratiotes aloides",
-        "Egzemplarze brzegowe z grubiastymi lisciami zakonzonymi ostrymi kolcami, podobnymi do aloesa.",
+        "Egzemplarze brzegowe z grubymi lisciami zakonczonymi ostrymi kolcami, podobnymi do aloesa.",
         "Strefa plycizny przybrzeznej o czystej, bogatej w wapn wodzie.",
         "Im wiecej osoki w jeziorze, tym lepsza jakosc wody — naturalny wskaznik ekologiczny."
     };
