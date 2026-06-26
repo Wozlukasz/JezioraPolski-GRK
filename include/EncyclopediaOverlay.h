@@ -5,19 +5,19 @@
 #include <glm/glm.hpp>
 
 struct PlantInfo {
-    std::string polishName;   // Polska nazwa wyświetlana w tytule
-    std::string latinName;    // Nazwa łacińska
-    std::string description;  // Krótki opis (2-3 zdania)
-    std::string habitat;      // Siedlisko
-    std::string interesting;  // Ciekawostka
+    std::string polishName;
+    std::string latinName;
+    std::string description;
+    std::string habitat;
+    std::string interesting;
 };
 
-// Pojedynczy glyph z atlasu fontu
+// Dane glypha z bitmapowego atlasu fontu
 struct GlyphInfo {
-    float x0, y0, x1, y1;     // Współrzędne UV w atlasie
-    float bx, by;              // Bearing (przesunięcie)
-    float advance;             // Postęp kursora
-    int w, h;                  // Wymiary glypha w pikselach
+    float s0, t0, s1, t1; // UV (s=x, t=y) w atlasie w przestrzeni OpenGL (t rośnie ku górze)
+    float bx, by;          // Bearing względem baseline (w pikselach przy rozmiarze referencyjnym)
+    float advance;         // Postęp kursora (piksele)
+    int   w, h;            // Wymiary glypha w pikselach atlasu
 };
 
 class EncyclopediaOverlay {
@@ -26,39 +26,48 @@ public:
     ~EncyclopediaOverlay();
 
     bool init(const std::string& fontPath = "");
-    void render(const std::string& plantSpeciesName, int screenW, int screenH, float deltaTime);
+
+    // Wywołaj po wykryciu kliknięcia — przełącza panel dla danej rośliny
+    void togglePanel(const std::string& plantSpeciesName);
+
+    // Renderowanie per-klatka
+    void render(int screenW, int screenH, float deltaTime);
+
+    bool isPanelVisible() const { return panelAlpha > 0.01f; }
 
 private:
-    unsigned int quadVAO = 0, quadVBO = 0;
-    unsigned int fontTexture = 0;
+    unsigned int quadVAO  = 0, quadVBO = 0;
+    unsigned int fontTex  = 0;
     unsigned int hudShader = 0;
-    bool initialized = false;
+    bool initialized      = false;
 
-    GlyphInfo glyphs[128];
-    float fontScale = 0.0f;
-    int atlasWidth = 512, atlasHeight = 512;
+    // ---- Font ----
+    static constexpr float ATLAS_FONT_PX = 24.0f; // Rozmiar referencyjny atlasu
+    int atlasW = 512, atlasH = 512;
     int fontAscent = 0, fontDescent = 0, fontLineGap = 0;
+    GlyphInfo glyphs[128]; // ASCII 32..127
 
-    // Dane encyklopedii — wypełniane przy inicjalizacji
+    // ---- Stan panelu ----
+    std::string lockedPlant = ""; // Gatunek aktualnie wyświetlany
+    float panelAlpha = 0.0f;     // Animacja fade-in/out
+
+    // ---- Dane encyklopedii ----
     std::map<std::string, PlantInfo> encyclopedia;
 
-    // Animacja pojawiania się panelu
-    float panelAlpha = 0.0f;         // 0.0 = niewidoczny, 1.0 = pełna widoczność
-    std::string currentPlant = "";
-    std::string lastPlant = "";
-
+    // ---- Inicjalizacja wewnętrzna ----
     void setupQuad();
     void buildEncyclopedia();
-    bool loadFont(const std::string& fontPath);
-    void buildFallbackFont();
+    bool loadFont(const std::string& path);
 
-    // Rysowanie
-    void drawRect(float x, float y, float w, float h, glm::vec4 color, int screenW, int screenH);
-    void drawText(const std::string& text, float x, float y, float pixelHeight,
-                  glm::vec4 color, int screenW, int screenH);
-    float measureTextWidth(const std::string& text, float pixelHeight);
-    void drawPanel(const PlantInfo& info, float alpha, int screenW, int screenH);
-    float drawWrappedText(const std::string& text, float x, float y,
-                          float maxWidth, float pixelHeight, glm::vec4 color,
-                          int screenW, int screenH);
+    // ---- Rysowanie ----
+    void drawRect(float x, float y, float w, float h, glm::vec4 color,
+                  int sw, int sh);
+    void drawGlyph(unsigned char c, float gx, float gy_baseline,
+                   float scale, glm::vec4 color, int sw, int sh);
+    void drawText(const std::string& text, float x, float y_baseline,
+                  float pixelH, glm::vec4 color, int sw, int sh);
+    float measureText(const std::string& text, float pixelH);
+    float drawWrapped(const std::string& text, float x, float y_baseline,
+                      float maxW, float pixelH, glm::vec4 color, int sw, int sh);
+    void drawPanel(const PlantInfo& info, float alpha, int sw, int sh);
 };

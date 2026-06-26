@@ -368,6 +368,15 @@ int main() {
 
     processInput(window);
 
+    // Detekcja kliknięcia LPM (edge-triggered, tylko gdy kursor jest zablokowany)
+    static bool prevLMB = false;
+    bool curLMB = (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS);
+    bool justClicked = curLMB && !prevLMB && captureMouse;
+    prevLMB = curLMB;
+    if (justClicked) {
+      std::string hovered = plantManager.getPlantAtCrosshair(cameraPos, cameraFront, 8.0f);
+      encyclopediaOverlay.togglePanel(hovered);
+    }
     // Update fish
     fishManager.update(deltaTime, cameraPos, feedingMode);
 
@@ -627,9 +636,8 @@ int main() {
     glDrawArrays(GL_TRIANGLES, 0, 36);
     glDepthFunc(GL_LESS);
 
-    // Encyklopedia roślin — ray-cast + overlay
-    std::string hoveredPlant = plantManager.getPlantAtCrosshair(cameraPos, cameraFront, 8.0f);
-    encyclopediaOverlay.render(hoveredPlant, width, height, deltaTime);
+    // Encyklopedia roślin — render per-klatka (stan zarzadzany przez togglePanel)
+    encyclopediaOverlay.render(width, height, deltaTime);
 
     glfwSwapBuffers(window);
     glfwPollEvents();
