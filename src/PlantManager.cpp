@@ -381,10 +381,12 @@ void PlantManager::render(unsigned int shader, const glm::vec3& camPos, const gl
     auto frustumPlanes = extractFrustumPlanes(vpMatrix);
     
     // Próg LOD: poniżej tego dystansu → szczegółowe, powyżej → flat.
-    float LOD_THRESHOLD = isReflection ? 25.0f : 40.0f;  // Dystans przejścia detail→flat 
+    float LOD_THRESHOLD = isReflection ? 15.0f : 30.0f;  // Dystans przejścia detail→flat 
     float FADE_BAND = 10.0f;      // Strefa crossfade między modelami
-    float RENDER_DIST = isReflection ? 300.0f : 800.0f;
-    const float CHUNK_RADIUS = 10.0f;   // Bardziej konserwatywny promień chunka
+    float RENDER_DIST = isReflection ? 250.0f : 800.0f;
+    // Zwiększony promień chunka (30m) — środek chunka jest na dnie, a rośliny rosną aż do powierzchni wody. 
+    // Przy małym promieniu, patrzenie na czubek rośliny blisko powierzchni powodowało odrzucenie całego chunka (Frustum Culling)
+    const float CHUNK_RADIUS = 30.0f;
     
     GLint loc_lodFadeMode = glGetUniformLocation(shader, "lodFadeMode");
     GLint loc_lodThreshold = glGetUniformLocation(shader, "lodThreshold");

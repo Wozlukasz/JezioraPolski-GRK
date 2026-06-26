@@ -161,7 +161,7 @@ int main() {
   bubbleSystem.init();
 
   // Shadow Map FBO
-  const unsigned int SHADOW_WIDTH = 4096, SHADOW_HEIGHT = 4096;
+  const unsigned int SHADOW_WIDTH = 2048, SHADOW_HEIGHT = 2048;
   unsigned int depthMapFBO;
   glGenFramebuffers(1, &depthMapFBO);
   unsigned int depthMap;

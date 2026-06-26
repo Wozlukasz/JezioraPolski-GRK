@@ -63,11 +63,11 @@ void main() {
     vec4 texColor = texture(texture_diffuse1, TexCoords);
     
     // Mipmapy powodują rozmycie kanału alpha, przez co cienkie modele tataraku znikają!
-    // Obniżamy próg dla płaskich modeli i modeli fade-out
+    // Obniżamy próg, by uniknąć znikania roślin, do których podpływa gracz
     float alphaThreshold;
     if (lodFadeMode == 2 || lodFadeMode == 3) alphaThreshold = 0.25;
-    else if (lodFadeMode == 1) alphaThreshold = 0.5;
-    else alphaThreshold = 0.8;
+    else alphaThreshold = 0.4; // Zawsze 0.4 dla modeli szczegółowych, by nie znikały z bliska!
+    
     if(texColor.a < alphaThreshold) discard;
     
     // ======== LOD Crossfade (Screen-door dithering) ========

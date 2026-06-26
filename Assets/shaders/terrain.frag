@@ -83,7 +83,7 @@ float ShadowCalculation(vec4 fragPosLightSpace, vec3 normal, vec3 lightVec) {
     
     float shadow = 0.0;
     vec2 texelSize = 1.0 / textureSize(shadowMap, 0);
-    // 3x3 PCF — 9 próbek (znacznie lepsza wydajność)
+    // 3x3 PCF — 9 próbek (optymalizacja wydajnościowa)
     for(int x = -1; x <= 1; ++x) {
         for(int y = -1; y <= 1; ++y) {
             float pcfDepth = texture(shadowMap, projCoords.xy + vec2(x, y) * texelSize).r; 
