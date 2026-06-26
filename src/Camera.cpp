@@ -242,16 +242,18 @@ void processInput(GLFWwindow* window) {
     const float WATER_LEVEL = 64.0f; // Poziom lustra wody w grze
     const float MAX_HEAD_ABOVE_WATER = 0.5f; // Maksymalne wychylenie nad wodę
 
-    // 1. Zablokuj wychodzenie zbyt wysoko nad powierzchnię wody
-    if (newPos.y > WATER_LEVEL + MAX_HEAD_ABOVE_WATER) {
-        newPos.y = WATER_LEVEL + MAX_HEAD_ABOVE_WATER;
+    // 1. Zablokuj wychodzenie zbyt wysoko nad powierzchnię wody (tylko nad obszarem wody)
+    float currentTerrainHeight = getTerrainHeight(newPos.x, newPos.z);
+    if (currentTerrainHeight > -900.0f && currentTerrainHeight < WATER_LEVEL) {
+        if (newPos.y > WATER_LEVEL + MAX_HEAD_ABOVE_WATER) {
+            newPos.y = WATER_LEVEL + MAX_HEAD_ABOVE_WATER;
+        }
     }
 
     // 2. Kolizja z terenem (zablokuj wchodzenie pod ziemię)
-    float newTerrainHeight = getTerrainHeight(newPos.x, newPos.z);
-    if (newTerrainHeight > -900.0f) {
-        if (newPos.y < newTerrainHeight + 1.5f) {
-            newPos.y = newTerrainHeight + 1.5f;
+    if (currentTerrainHeight > -900.0f) {
+        if (newPos.y < currentTerrainHeight + 1.5f) {
+            newPos.y = currentTerrainHeight + 1.5f;
         }
         cameraPos = newPos;
     }

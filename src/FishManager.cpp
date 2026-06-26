@@ -81,7 +81,15 @@ std::vector<glm::vec3> FishManager::generateSwimPath(glm::vec3 center, float rad
         float yBase = (yMin + yMax) * 0.5f;
         float yAmplitude = (yMax - yMin) * 0.3f;
         float y = yBase + yAmplitude * sin(baseAngle * 1.5f) + (yVar(rng) - yBase) * 0.2f;
-        y = glm::clamp(y, yMin, yMax);
+        
+        // Zabezpieczenie przed wchodzeniem pod dno przy generowaniu ścieżki
+        float terrainH = getTerrainHeight(x, z);
+        float minY = (terrainH > -900.0f) ? (terrainH + 1.0f) : yMin;
+        float maxY = yMax;
+        if (minY > maxY) {
+            minY = maxY - 0.2f;
+        }
+        y = glm::clamp(y, minY, maxY);
         cp.push_back(glm::vec3(x, y, z));
     }
 
@@ -203,7 +211,7 @@ void FishManager::update(float deltaTime, const glm::vec3& cameraPos, bool feedi
         float distToCamera = glm::distance(fishWorldPos, cameraPos);
         float targetPanic = 0.0f;
 
-        if (cameraPos.y < 64.0f) {
+        if (cameraPos.y < 64.0f && !feedingMode) {
             glm::vec3 toFish = fishWorldPos - cameraPos;
             if (distToCamera > 0.001f) {
                 toFish /= distToCamera;
@@ -230,11 +238,16 @@ void FishManager::update(float deltaTime, const glm::vec3& cameraPos, bool feedi
             if (fish.panicLevel < targetPanic) fish.panicLevel = targetPanic;
         }
 
-        // Predkość zależy od paniki (max 6x szybciej)
-        float currentFleeMult = 1.0f + (5.0f * fish.panicLevel);
+        // Prędkość zależy od paniki (max 6x szybciej) lub karmienia (1.5x szybciej do jedzenia)
+        float currentSpeedMult = 1.0f;
+        if (feedingMode && cameraPos.y < 64.0f && distToCamera < 30.0f) {
+            currentSpeedMult = 1.5f;
+        } else {
+            currentSpeedMult = 1.0f + (5.0f * fish.panicLevel);
+        }
 
         // Advance along path (globally slowed down to swim slower and more gracefully)
-        fish.t += fish.speed * 0.25f * currentFleeMult * deltaTime;
+        fish.t += fish.speed * 0.25f * currentSpeedMult * deltaTime;
         if (fish.t >= 1.0f) fish.t -= 1.0f;
         if (fish.t < 0.0f)  fish.t += 1.0f;
     }
@@ -282,20 +295,72 @@ void FishManager::render(unsigned int shader, const glm::mat4& view, const glm::
         // Build model matrix from interpolated frame + scale (increased size)
         float scale = (fish.speciesIndex == 0) ? 3.0f : 2.0f;
         
-        glm::vec3 finalPos = interpPos;
-        if (fish.panicLevel > 0.01f) {
-            glm::vec3 prePanicWorldPos = interpPos 
-                + (-interpBinorm) * fish.localOffset.y 
-                + (-interpNorm) * fish.localOffset.z;
-            
-            glm::vec3 fleeDir = prePanicWorldPos - cameraPos;
+        // Bazowa pozycja ryby w świecie (przed paniką / przyciąganiem)
+        glm::vec3 baseWorldPos = interpPos 
+            + (-interpBinorm) * fish.localOffset.y 
+            + (-interpNorm) * fish.localOffset.z;
+
+        glm::vec3 finalWorldPos = baseWorldPos;
+
+        if (feedingMode && cameraPos.y < 64.0f) {
+            float distToCamera = glm::distance(baseWorldPos, cameraPos);
+            if (distToCamera < 30.0f) {
+                // Przyciąganie do kamery (karmienie) - gromadzenie się w odległości 3.5m
+                float attractionFactor = (1.0f - (distToCamera / 30.0f)) * 0.75f;
+                glm::vec3 targetPos = cameraPos;
+                if (distToCamera > 0.001f) {
+                    targetPos += glm::normalize(baseWorldPos - cameraPos) * 3.5f;
+                } else {
+                    targetPos += glm::vec3(3.5f, 0.0f, 0.0f);
+                }
+                finalWorldPos = glm::mix(baseWorldPos, targetPos, attractionFactor);
+
+                // Ryba patrzy w stronę kamery podczas przyciągania
+                glm::vec3 lookDir = cameraPos - finalWorldPos;
+                if (glm::length(lookDir) > 0.01f) {
+                    interpTan = glm::normalize(lookDir);
+                    // Rzutujemy normalną na płaszczyznę prostopadłą do nowego tangentu
+                    glm::vec3 projNorm = interpNorm - glm::dot(interpNorm, interpTan) * interpTan;
+                    if (glm::length(projNorm) > 0.01f) {
+                        interpNorm = glm::normalize(projNorm);
+                    } else {
+                        glm::vec3 helper = (std::abs(glm::dot(interpTan, glm::vec3(0, 1, 0))) < 0.9f) ? glm::vec3(0, 1, 0) : glm::vec3(1, 0, 0);
+                        interpNorm = glm::normalize(glm::cross(interpTan, helper));
+                    }
+                    interpBinorm = glm::normalize(glm::cross(interpTan, interpNorm));
+                }
+            }
+        } else if (fish.panicLevel > 0.01f) {
+            glm::vec3 fleeDir = baseWorldPos - cameraPos;
             fleeDir.y *= 0.2f;
             if (glm::length(fleeDir) > 0.001f) {
                 fleeDir = glm::normalize(fleeDir);
             }
             glm::vec3 escapeDir = glm::normalize(fleeDir * 0.7f + fish.scatterDir * 0.3f);
-            finalPos += escapeDir * (fish.panicLevel * 25.0f); // Zwiększony odskok do 25m
+            finalWorldPos += escapeDir * (fish.panicLevel * 25.0f); // Zwiększony odskok do 25m
+
+            // Ryba patrzy w kierunku ucieczki
+            if (glm::length(escapeDir) > 0.01f) {
+                interpTan = escapeDir;
+                glm::vec3 projNorm = interpNorm - glm::dot(interpNorm, interpTan) * interpTan;
+                if (glm::length(projNorm) > 0.01f) {
+                    interpNorm = glm::normalize(projNorm);
+                } else {
+                    glm::vec3 helper = (std::abs(glm::dot(interpTan, glm::vec3(0, 1, 0))) < 0.9f) ? glm::vec3(0, 1, 0) : glm::vec3(1, 0, 0);
+                    interpNorm = glm::normalize(glm::cross(interpTan, helper));
+                }
+                interpBinorm = glm::normalize(glm::cross(interpTan, interpNorm));
+            }
         }
+
+        // Zabezpieczenie przed wypływaniem nad wodę i wchodzeniem pod dno
+        float terrainHeight = getTerrainHeight(finalWorldPos.x, finalWorldPos.z);
+        float minH = (terrainHeight > -900.0f) ? (terrainHeight + 1.0f) : 30.0f;
+        float maxH = 63.5f; // lustro wody = 64.0f
+        if (minH > maxH) {
+            minH = maxH - 0.2f;
+        }
+        finalWorldPos.y = glm::clamp(finalWorldPos.y, minH, maxH);
 
         // OBJ model: nose along -X (swims forward), dorsal fin along -Y (fix upside-down)
         // W PTF normal to wektor w poziomie, a binormal to wektor w pionie (w dół).
@@ -304,11 +369,8 @@ void FishManager::render(unsigned int shader, const glm::mat4& view, const glm::
             glm::vec4(-interpTan,    0.0f),  // X = -tangent (kierunek przodu)
             glm::vec4(-interpBinorm, 0.0f),  // Y = -binormal (kierunek góry)
             glm::vec4(-interpNorm,   0.0f),  // Z = -normal (prawy bok, dla zachowania prawoskrętności)
-            glm::vec4(finalPos,      1.0f)
+            glm::vec4(finalWorldPos,      1.0f)
         );
-        
-        // Zastosuj lokalny offset (ryby trzymają się równolegle do głównej ścieżki ławicy)
-        model = glm::translate(model, fish.localOffset);
 
         model = glm::scale(model, glm::vec3(scale));
 
@@ -353,28 +415,76 @@ void FishManager::renderShadow(unsigned int shadowShader, const glm::mat4& light
         glm::vec3 interpBinorm = glm::normalize(glm::mix(f1.binormal, f2.binormal, frac));
 
         float scale = (fish.speciesIndex == 0) ? 3.0f : 2.0f;
-        glm::vec3 finalPos = interpPos;
-        if (fish.panicLevel > 0.01f) {
-            glm::vec3 prePanicWorldPos = interpPos 
-                + (-interpBinorm) * fish.localOffset.y 
-                + (-interpNorm) * fish.localOffset.z;
-            
-            glm::vec3 fleeDir = prePanicWorldPos - cameraPos;
+        
+        // Bazowa pozycja ryby w świecie (przed paniką / przyciąganiem)
+        glm::vec3 baseWorldPos = interpPos 
+            + (-interpBinorm) * fish.localOffset.y 
+            + (-interpNorm) * fish.localOffset.z;
+
+        glm::vec3 finalWorldPos = baseWorldPos;
+
+        if (feedingMode && cameraPos.y < 64.0f) {
+            float distToCamera = glm::distance(baseWorldPos, cameraPos);
+            if (distToCamera < 30.0f) {
+                float attractionFactor = (1.0f - (distToCamera / 30.0f)) * 0.75f;
+                glm::vec3 targetPos = cameraPos;
+                if (distToCamera > 0.001f) {
+                    targetPos += glm::normalize(baseWorldPos - cameraPos) * 3.5f;
+                } else {
+                    targetPos += glm::vec3(3.5f, 0.0f, 0.0f);
+                }
+                finalWorldPos = glm::mix(baseWorldPos, targetPos, attractionFactor);
+
+                glm::vec3 lookDir = cameraPos - finalWorldPos;
+                if (glm::length(lookDir) > 0.01f) {
+                    interpTan = glm::normalize(lookDir);
+                    glm::vec3 projNorm = interpNorm - glm::dot(interpNorm, interpTan) * interpTan;
+                    if (glm::length(projNorm) > 0.01f) {
+                        interpNorm = glm::normalize(projNorm);
+                    } else {
+                        glm::vec3 helper = (std::abs(glm::dot(interpTan, glm::vec3(0, 1, 0))) < 0.9f) ? glm::vec3(0, 1, 0) : glm::vec3(1, 0, 0);
+                        interpNorm = glm::normalize(glm::cross(interpTan, helper));
+                    }
+                    interpBinorm = glm::normalize(glm::cross(interpTan, interpNorm));
+                }
+            }
+        } else if (fish.panicLevel > 0.01f) {
+            glm::vec3 fleeDir = baseWorldPos - cameraPos;
             fleeDir.y *= 0.2f;
             if (glm::length(fleeDir) > 0.001f) {
                 fleeDir = glm::normalize(fleeDir);
             }
             glm::vec3 escapeDir = glm::normalize(fleeDir * 0.7f + fish.scatterDir * 0.3f);
-            finalPos += escapeDir * (fish.panicLevel * 25.0f);
+            finalWorldPos += escapeDir * (fish.panicLevel * 25.0f);
+
+            if (glm::length(escapeDir) > 0.01f) {
+                interpTan = escapeDir;
+                glm::vec3 projNorm = interpNorm - glm::dot(interpNorm, interpTan) * interpTan;
+                if (glm::length(projNorm) > 0.01f) {
+                    interpNorm = glm::normalize(projNorm);
+                } else {
+                    glm::vec3 helper = (std::abs(glm::dot(interpTan, glm::vec3(0, 1, 0))) < 0.9f) ? glm::vec3(0, 1, 0) : glm::vec3(1, 0, 0);
+                    interpNorm = glm::normalize(glm::cross(interpTan, helper));
+                }
+                interpBinorm = glm::normalize(glm::cross(interpTan, interpNorm));
+            }
         }
+
+        // Zabezpieczenie przed wypływaniem nad wodę i wchodzeniem pod dno
+        float terrainHeight = getTerrainHeight(finalWorldPos.x, finalWorldPos.z);
+        float minH = (terrainHeight > -900.0f) ? (terrainHeight + 1.0f) : 30.0f;
+        float maxH = 63.5f;
+        if (minH > maxH) {
+            minH = maxH - 0.2f;
+        }
+        finalWorldPos.y = glm::clamp(finalWorldPos.y, minH, maxH);
 
         glm::mat4 model = glm::mat4(
             glm::vec4(-interpTan,    0.0f),
             glm::vec4(-interpBinorm, 0.0f),
             glm::vec4(-interpNorm,   0.0f),
-            glm::vec4(finalPos,      1.0f)
+            glm::vec4(finalWorldPos,      1.0f)
         );
-        model = glm::translate(model, fish.localOffset);
 
         model = glm::scale(model, glm::vec3(scale));
 
