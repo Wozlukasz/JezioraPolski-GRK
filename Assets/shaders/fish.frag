@@ -96,6 +96,13 @@ float caustics(vec3 pos, float t) {
 }
 
 void main() {
+    // EARLY FOG DISCARD (Optymalizacja wydajnościowa)
+    if (viewPos.y < 64.0) {
+        vec3 dir = normalize(FragPos - viewPos);
+        float underwaterDist = (FragPos.y > 64.0) ? (64.0 - viewPos.y) / max(dir.y, 0.001) : length(FragPos - viewPos);
+        if (underwaterDist > 70.0) discard;
+    }
+
     // Sample PBR textures
     vec3 albedo = texture(albedoMap, TexCoords).rgb;
     float roughness = texture(roughnessMap, TexCoords).r;
