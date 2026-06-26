@@ -217,32 +217,49 @@ void processInput(GLFWwindow* window) {
 
     glm::vec3 front = glm::normalize(cameraFront);
     glm::vec3 right = glm::normalize(glm::cross(front, cameraUp));
-    glm::vec3 up    = glm::vec3(0.0f, 1.0f, 0.0f);
+
+    // Wektory ruchu spłaszczone do płaszczyzny XZ (żeby patrzenie w górę nie powodowało latania)
+    glm::vec3 flatFront = glm::normalize(glm::vec3(front.x, 0.0f, front.z));
+    if (glm::length(glm::vec3(front.x, 0.0f, front.z)) < 0.001f) {
+        flatFront = glm::vec3(0.0f, 0.0f, -1.0f);
+    }
+    glm::vec3 flatRight = glm::normalize(glm::cross(flatFront, glm::vec3(0.0f, 1.0f, 0.0f)));
 
     glm::vec3 newPos = cameraPos;
     if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
-        newPos += currentSpeed * front;
+        newPos += currentSpeed * flatFront;
     if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
-        newPos -= currentSpeed * front;
+        newPos -= currentSpeed * flatFront;
     if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
-        newPos -= currentSpeed * right;
+        newPos -= currentSpeed * flatRight;
     if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
-        newPos += currentSpeed * right;
-    if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS)
-        newPos += currentSpeed * up;
-    if (glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS)
-        newPos -= currentSpeed * up;
+        newPos += currentSpeed * flatRight;
+
     if (glfwGetKey(window, GLFW_KEY_T) == GLFW_PRESS) {
         newPos = glm::vec3(28.0f, 57.0f, 35.0f);
         std::cout << "Teleportacja do lawicy ryb: (28, 57, 35)" << std::endl;
     }
 
-    // Sprawdź czy nowa pozycja jest na terenie
+    // Grawitacja i skakanie
+    static float velocityY = 0.0f;
+    const float GRAVITY = -20.0f;
+    const float JUMP_FORCE = 7.0f;
+    const float EYE_HEIGHT = 1.8f;
+
+    velocityY += GRAVITY * clampedDt;
+    newPos.y += velocityY * clampedDt;
+
+    // Kolizja z terenem
     float newTerrainHeight = getTerrainHeight(newPos.x, newPos.z);
     if (newTerrainHeight > -900.0f) {
-        // Blokada przed wejściem pod ziemię (1.0m nad terenem)
-        if (newPos.y < newTerrainHeight + 1.0f) {
-            newPos.y = newTerrainHeight + 1.0f;
+        if (newPos.y <= newTerrainHeight + EYE_HEIGHT) {
+            newPos.y = newTerrainHeight + EYE_HEIGHT;
+            velocityY = 0.0f; // Jesteśmy na ziemi
+
+            // Możliwość skoku tylko będąc na ziemi
+            if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS) {
+                velocityY = JUMP_FORCE;
+            }
         }
         cameraPos = newPos;
     }
