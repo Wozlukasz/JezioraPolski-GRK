@@ -4,14 +4,16 @@ out vec4 FragColor;
 in vec2 TexCoord;
 
 uniform sampler2D hudTex;
-uniform vec4 color;    // Kolor bazowy (dla tła: rgba, dla tekstu: rgba)
-uniform int useTexture; // 0 = solid color, 1 = texture (font atlas)
+uniform vec4 color;
+uniform int useTexture;
 
 void main() {
     if (useTexture == 1) {
-        // Font atlas: czerwony kanał = pokrycie glypha
-        float alpha = texture(hudTex, TexCoord).r;
-        FragColor = vec4(color.rgb, color.a * alpha);
+        // Czytamy kanal R (atlas czcionki). Swizzle GL_RED,RED,RED,RED
+        // sprawia ze texture().rgba = (r,r,r,r), wiec .r zawsze dziala.
+        float coverage = texture(hudTex, TexCoord).r;
+        if (coverage < 0.02) discard;
+        FragColor = vec4(color.rgb, color.a * coverage);
     } else {
         FragColor = color;
     }
