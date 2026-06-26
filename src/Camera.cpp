@@ -173,7 +173,7 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
         }
     }
     // Flashlight toggle
-    if (key == GLFW_KEY_F && action == GLFW_PRESS) {
+    if (key == GLFW_KEY_L && action == GLFW_PRESS) {
         flashlightOn = !flashlightOn;
         std::cout << "Latarka: " << (flashlightOn ? "ON" : "OFF") << std::endl;
     }
@@ -188,7 +188,7 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
         std::cout << "Karmienie ryb: " << (feedingMode ? "ON" : "OFF") << std::endl;
     }
     // Fullscreen toggle
-    if (key == GLFW_KEY_F11 && action == GLFW_PRESS) {
+    if (key == GLFW_KEY_F && action == GLFW_PRESS) {
         static int winX = 0, winY = 0, winW = 1200, winH = 800;
         if (glfwGetWindowMonitor(window)) {
             // Restore to windowed mode
