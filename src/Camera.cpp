@@ -187,6 +187,21 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
         feedingMode = !feedingMode;
         std::cout << "Karmienie ryb: " << (feedingMode ? "ON" : "OFF") << std::endl;
     }
+    // Fullscreen toggle
+    if (key == GLFW_KEY_F11 && action == GLFW_PRESS) {
+        static int winX = 0, winY = 0, winW = 1200, winH = 800;
+        if (glfwGetWindowMonitor(window)) {
+            // Restore to windowed mode
+            glfwSetWindowMonitor(window, nullptr, winX, winY, winW, winH, 0);
+        } else {
+            // Switch to full screen
+            glfwGetWindowPos(window, &winX, &winY);
+            glfwGetWindowSize(window, &winW, &winH);
+            GLFWmonitor* monitor = glfwGetPrimaryMonitor();
+            const GLFWvidmode* mode = glfwGetVideoMode(monitor);
+            glfwSetWindowMonitor(window, monitor, 0, 0, mode->width, mode->height, mode->refreshRate);
+        }
+    }
 }
 
 void processInput(GLFWwindow* window) {
